@@ -1,16 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import {
-  DEFAULT_END_TIME,
-  DEFAULT_START_TIME,
-  buildDateRangeWhereClause,
-  isSameTime,
-  normalizeDateTimeRangeValue,
-  type DateTimeRangeValue,
-  type TimeValue,
-} from '@/utils/date-range';
 import { useAutoRefreshInterval } from '@/hooks/use-auto-refresh-interval';
+import { type DateTimeRangeValue } from '@/utils/date-range';
 import { useDebounce } from '@/hooks/use-debounce';
 import { usePaginationSearch } from '@/hooks/use-pagination-search';
 import useInterval from '@/hooks/useInterval';
@@ -19,159 +11,21 @@ import { PageHeader } from '@/components/layout/page-header';
 import { RequestsTable, type RequestTableFilters } from './components';
 import { RequestsProvider } from './context';
 import { useRequests } from './data';
-
-const REQUEST_FILTER_SEARCH_KEYS = {
-  status: 'status',
-  source: 'source',
-  channel: 'channel',
-  apiKey: 'apiKey',
-  modelID: 'modelID',
-  createdAtFrom: 'createdAtFrom',
-  createdAtTo: 'createdAtTo',
-  createdAtStartTime: 'createdAtStartTime',
-  createdAtEndTime: 'createdAtEndTime',
-} as const;
-
-const REQUEST_CURSOR_SEARCH_KEYS = ['startCursor', 'endCursor', 'cursorDirection', 'cursorHistory'] as const;
-
-type RequestSearchFilters = RequestTableFilters & {
-  dateRange?: DateTimeRangeValue;
-};
-
-function getSearchString(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) {
-    const first = value.find((item): item is string => typeof item === 'string');
-    return first ?? '';
-  }
-  return '';
-}
-
-function getSearchStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
-  }
-
-  if (typeof value !== 'string' || value.length === 0) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
-    }
-  } catch {
-    // Fall through to comma-separated search values.
-  }
-
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function setSearchStringArray(draft: Record<string, unknown>, key: string, value: string[]) {
-  if (value.length > 0) {
-    draft[key] = value;
-  } else {
-    delete draft[key];
-  }
-}
-
-function setSearchString(draft: Record<string, unknown>, key: string, value: string) {
-  const normalized = value.trim();
-  if (normalized) {
-    draft[key] = normalized;
-  } else {
-    delete draft[key];
-  }
-}
-
-function pad2(value: number) {
-  return value.toString().padStart(2, '0');
-}
-
-function formatSearchDate(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-
-function parseSearchDate(value: unknown): Date | undefined {
-  const raw = getSearchString(value);
-  if (!raw) return undefined;
-
-  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dateOnly) {
-    const year = Number.parseInt(dateOnly[1], 10);
-    const month = Number.parseInt(dateOnly[2], 10);
-    const day = Number.parseInt(dateOnly[3], 10);
-    const date = new Date(year, month - 1, day);
-
-    if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
-      return date;
-    }
-    return undefined;
-  }
-
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? undefined : date;
-}
-
-function clampTimePart(value: string | undefined, max: number, fallback: string) {
-  const parsed = Number.parseInt(value ?? '', 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return pad2(Math.min(Math.max(parsed, 0), max));
-}
-
-function formatSearchTime(time: TimeValue) {
-  return `${time.hh}:${time.mm}:${time.ss}`;
-}
-
-function parseSearchTime(value: unknown, fallback: TimeValue): TimeValue {
-  const raw = getSearchString(value);
-  if (!raw) return fallback;
-
-  const [hh, mm, ss] = raw.split(':');
-  return {
-    hh: clampTimePart(hh, 23, fallback.hh),
-    mm: clampTimePart(mm, 59, fallback.mm),
-    ss: clampTimePart(ss, 59, fallback.ss),
-  };
-}
-
-function parseRequestSearchFilters(search: Record<string, unknown>): RequestSearchFilters {
-  const from = parseSearchDate(search[REQUEST_FILTER_SEARCH_KEYS.createdAtFrom]);
-  const to = parseSearchDate(search[REQUEST_FILTER_SEARCH_KEYS.createdAtTo]);
-  const hasDateRange = !!from || !!to;
-
-  return {
-    statusFilter: getSearchStringArray(search[REQUEST_FILTER_SEARCH_KEYS.status]),
-    sourceFilter: getSearchStringArray(search[REQUEST_FILTER_SEARCH_KEYS.source]),
-    channelFilter: getSearchStringArray(search[REQUEST_FILTER_SEARCH_KEYS.channel]),
-    apiKeyFilter: getSearchStringArray(search[REQUEST_FILTER_SEARCH_KEYS.apiKey]),
-    modelIDFilter: getSearchString(search[REQUEST_FILTER_SEARCH_KEYS.modelID]),
-    dateRange: hasDateRange
-      ? normalizeDateTimeRangeValue({
-          from,
-          to,
-          startTime: parseSearchTime(search[REQUEST_FILTER_SEARCH_KEYS.createdAtStartTime], DEFAULT_START_TIME),
-          endTime: parseSearchTime(search[REQUEST_FILTER_SEARCH_KEYS.createdAtEndTime], DEFAULT_END_TIME),
-        })
-      : undefined,
-  };
-}
-
-function clearRequestCursorSearch(draft: Record<string, unknown>) {
-  REQUEST_CURSOR_SEARCH_KEYS.forEach((key) => {
-    delete draft[key];
-  });
-}
-
-function clearRequestFilterSearch(draft: Record<string, unknown>) {
-  Object.values(REQUEST_FILTER_SEARCH_KEYS).forEach((key) => {
-    delete draft[key];
-  });
-}
+import {
+  DEFAULT_END_TIME,
+  DEFAULT_START_TIME,
+  REQUEST_FILTER_SEARCH_KEYS,
+  buildRequestWhereClause,
+  clearRequestCursorSearch,
+  clearRequestFilterSearch,
+  formatSearchDate,
+  formatSearchTime,
+  isSameTime,
+  normalizeDateTimeRangeValue,
+  parseRequestSearchFilters,
+  setSearchString,
+  setSearchStringArray,
+} from './request-search';
 
 function RequestsContent() {
   const navigate = useNavigate();
@@ -189,28 +43,10 @@ function RequestsContent() {
   const debouncedModelIDFilter = useDebounce(modelIDFilter, 300);
   const [autoRefreshInterval, setAutoRefreshInterval] = useAutoRefreshInterval('requests-auto-refresh-interval-ms');
 
-  // Build where clause with filters
-  const whereClause = (() => {
-    const where: { [key: string]: any } = {
-      ...buildDateRangeWhereClause(dateRange),
-    };
-    if (statusFilter.length > 0) {
-      where.statusIn = statusFilter;
-    }
-    if (sourceFilter.length > 0) {
-      where.sourceIn = sourceFilter;
-    }
-    if (channelFilter.length > 0) {
-      where.channelIDIn = channelFilter;
-    }
-    if (apiKeyFilter.length > 0) {
-      where.apiKeyIDIn = apiKeyFilter;
-    }
-    if (debouncedModelIDFilter) {
-      where.modelIDContainsFold = debouncedModelIDFilter;
-    }
-    return Object.keys(where).length > 0 ? where : undefined;
-  })();
+  const whereClause = buildRequestWhereClause(
+    { statusFilter, sourceFilter, channelFilter, apiKeyFilter, modelIDFilter, dateRange },
+    debouncedModelIDFilter
+  );
 
   const { data, isLoading, refetch } = useRequests({
     ...paginationArgs,

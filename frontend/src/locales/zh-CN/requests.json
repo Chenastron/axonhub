@@ -128,6 +128,8 @@
   "requests.detail.audioNotSupported": "您的浏览器不支持音频播放。",
   "requests.detail.audioNotStored": "音频未被存储。配置外部存储后可在此试听。",
   "requests.detail.audioLoadFailed": "音频加载失败。请检查存储配置，或使用下载按钮重试。",
+  "requests.detail.previous": "上一条",
+  "requests.detail.next": "下一条",
   "requests.dialogs.jsonViewer.responseChunks": "响应块",
   "requests.dialogs.jsonViewer.copy": "复制",
   "requests.dialogs.jsonViewer.copied": "已复制",

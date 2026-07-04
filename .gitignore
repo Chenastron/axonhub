@@ -173,6 +173,7 @@ deploy_dev.sh
 
 start.sh
 stop.sh
+restart.sh
 
 # Patches and temporary patch folders
 /patches/

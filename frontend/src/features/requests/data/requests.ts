@@ -3,6 +3,7 @@ import { graphqlRequest } from '@/gql/graphql';
 import { useTranslation } from 'react-i18next';
 import { useSelectedProjectId } from '@/stores/projectStore';
 import { useErrorHandler } from '@/hooks/use-error-handler';
+import { extractNumberIDAsNumber } from '@/lib/utils';
 import { useRequestPermissions } from '../../../hooks/useRequestPermissions';
 import {
   Request,
@@ -352,7 +353,6 @@ export function useRequest(
   }
 ) {
   const { handleError } = useErrorHandler();
-  const { t } = useTranslation();
   const permissions = useRequestPermissions();
   const selectedProjectId = useSelectedProjectId();
   const queryClient = useQueryClient();
@@ -414,6 +414,121 @@ export function useRequest(
 
       return query.state.data?.status === 'processing' ? 2000 : false;
     },
+  });
+}
+
+function buildRequestAdjacentQuery(permissions: { canViewApiKeys: boolean; canViewChannels: boolean }) {
+  const apiKeyFields = permissions.canViewApiKeys
+    ? `
+            apiKey {
+              id
+              name
+            }`
+    : '';
+
+  const requestChannelFields = permissions.canViewChannels
+    ? `
+            channel {
+              id
+              name
+            }`
+    : '';
+
+  return `
+    query GetRequestAdjacent($previousWhere: RequestWhereInput, $nextWhere: RequestWhereInput) {
+      previous: requests(first: 1, orderBy: { field: CREATED_AT, direction: DESC }, where: $previousWhere) {
+        edges {
+          node {
+            id
+            createdAt
+            updatedAt${apiKeyFields}${requestChannelFields}
+            source
+            modelID
+            format
+            stream
+            status
+            clientIP
+            metricsLatencyMs
+            metricsFirstTokenLatencyMs
+            metricsReasoningDurationMs
+          }
+        }
+      }
+      next: requests(first: 1, orderBy: { field: CREATED_AT, direction: ASC }, where: $nextWhere) {
+        edges {
+          node {
+            id
+            createdAt
+            updatedAt${apiKeyFields}${requestChannelFields}
+            source
+            modelID
+            format
+            stream
+            status
+            clientIP
+            metricsLatencyMs
+            metricsFirstTokenLatencyMs
+            metricsReasoningDurationMs
+          }
+        }
+      }
+    }
+  `;
+}
+
+export function useAdjacentRequests(
+  request: Request | null | undefined,
+  options?: {
+    where?: Record<string, any>;
+    projectId?: string | null;
+    enabled?: boolean;
+  }
+) {
+  const { handleError } = useErrorHandler();
+  const { t } = useTranslation();
+  const permissions = useRequestPermissions();
+  const selectedProjectId = useSelectedProjectId();
+  const projectId = options?.projectId !== undefined ? options.projectId : selectedProjectId;
+  const enabled = options?.enabled ?? true;
+  const requestNumericId = request ? extractNumberIDAsNumber(request.id) : Number.NaN;
+
+  return useQuery({
+    queryKey: ['request-adjacent', request?.id, request?.createdAt, options?.where, permissions, projectId],
+    queryFn: async () => {
+      try {
+        if (!request || !Number.isFinite(requestNumericId)) {
+          return { previous: null, next: null };
+        }
+
+        const baseWhere: Record<string, any> = { ...(options?.where ?? {}) };
+        if (projectId) baseWhere.projectID = projectId;
+        const hasBaseWhere = Object.keys(baseWhere).length > 0;
+
+        const withBaseWhere = (cursorWhere: Record<string, any>) =>
+          hasBaseWhere ? { and: [baseWhere, cursorWhere] } : cursorWhere;
+        const previousWhere = withBaseWhere({ idLT: request.id });
+        const nextWhere = withBaseWhere({ idGT: request.id });
+
+        const query = buildRequestAdjacentQuery(permissions);
+        const headers = projectId ? { 'X-Project-ID': projectId } : undefined;
+        const data = await graphqlRequest<{ previous: RequestConnection; next: RequestConnection }>(
+          query,
+          { previousWhere, nextWhere },
+          headers
+        );
+
+        return {
+          previous: data.previous?.edges?.[0]?.node ? requestSchema.parse(data.previous.edges[0].node) : null,
+          next: data.next?.edges?.[0]?.node ? requestSchema.parse(data.next.edges[0].node) : null,
+        };
+      } catch (error) {
+        handleError(error, { showToast: false });
+        return { previous: null, next: null };
+      }
+    },
+    enabled: enabled && !!request && Number.isFinite(requestNumericId),
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 }
 

@@ -128,6 +128,8 @@
   "requests.detail.audioNotSupported": "Your browser does not support audio playback.",
   "requests.detail.audioNotStored": "Audio is not stored. Configure external storage to enable playback.",
   "requests.detail.audioLoadFailed": "Failed to load audio. Check storage configuration or use the download button.",
+  "requests.detail.previous": "Previous",
+  "requests.detail.next": "Next",
   "requests.dialogs.jsonViewer.responseChunks": "Response Chunks",
   "requests.dialogs.jsonViewer.copy": "Copy",
   "requests.dialogs.jsonViewer.copied": "Copied",
