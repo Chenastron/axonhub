@@ -28,6 +28,7 @@ import { parseRequestConversation } from '../utils/request-conversation';
 import { generateRequestCurl, generateExecutionCurl } from '../utils/curl-generator';
 import { getVideoLastFrameURL, isVideoRequestFormat } from '../utils/video-display';
 import { getExecutionModelAuditVerdict, MODEL_AUDIT_VERDICT_CLASS } from '../utils/upstream-model-audit';
+import { normalizeRequestGUID } from '../utils/request-id';
 
 // The detail page renders whole request and response payloads. Expanding every
 // level eagerly produces hundreds of thousands of characters of DOM for a large
@@ -57,9 +58,10 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
   const [audioLoadFailed, setAudioLoadFailed] = useState(false);
   const [responseView, setResponseView] = useState<'preview' | 'json'>('preview');
   const [requestBodyView, setRequestBodyView] = useState<'conversation' | 'json'>('conversation');
+  const normalizedRequestId = normalizeRequestGUID(requestId);
 
   const { data: settings } = useGeneralSettings();
-  const { data: requestData, isLoading } = useRequest(requestId, { projectId, disableAutoRefresh: isPreviewStreaming });
+  const { data: requestData, isLoading } = useRequest(normalizedRequestId, { projectId, disableAutoRefresh: isPreviewStreaming });
   const request = previewRequest ?? requestData;
 
   // Auto-select the appropriate request-body view once data is available:
@@ -79,7 +81,7 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
     isLoading: isExecutionsLoading,
     isError: isExecutionsError,
   } = useRequestExecutions(
-    requestId,
+    normalizedRequestId,
     {
       first: 10,
       orderBy: { field: 'CREATED_AT', direction: 'DESC' },
@@ -89,7 +91,7 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
   const { data: usageLogs } = useUsageLogs(
     {
       first: 1,
-      where: { requestID: requestId },
+      where: { requestID: normalizedRequestId },
       orderBy: { field: 'CREATED_AT', direction: 'DESC' },
     },
     { projectId, enabled: true }

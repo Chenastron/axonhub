@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { useParams, useNavigate, useRouterState } from '@tanstack/react-router';
-import { ArrowLeft, Copy, FileText } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Copy, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { getTokenFromStorage } from '@/stores/authStore';
@@ -15,7 +15,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Header } from '@/components/layout/header';
 import { Main } from '@/components/layout/main';
 import { useStoragePolicy } from '@/features/system/data/system';
-import { type Request, useRequest } from '../data';
+import { type Request, useAdjacentRequests, useRequest } from '../data';
+import { buildRequestWhereClause, parseRequestSearchFilters } from '../request-search';
+import { normalizeRequestGUID } from '../utils/request-id';
 import { RequestDetailContent } from './request-detail-content';
 
 type PreviewFallbackResponse = {
@@ -136,13 +138,20 @@ export default function RequestDetailPage() {
   const previewCompletedRef = useRef(false);
   const previewChunkCountRef = useRef(0);
   const previousRequestIdRef = useRef<string | null>(null);
+  const normalizedRequestId = normalizeRequestGUID(requestId);
 
-  const { data: requestData, refetch: refetchRequest } = useRequest(requestId, {
+  const { data: requestData, refetch: refetchRequest } = useRequest(normalizedRequestId, {
     projectId: selectedProjectId,
     disableAutoRefresh: isPreviewStreaming,
   });
 
   const request = previewRequest ?? requestData;
+  const searchFilters = useMemo(() => parseRequestSearchFilters(currentSearch), [currentSearch]);
+  const adjacentWhere = useMemo(() => buildRequestWhereClause(searchFilters), [searchFilters]);
+  const { data: adjacentRequests, isLoading: isAdjacentLoading } = useAdjacentRequests(request, {
+    projectId: selectedProjectId,
+    where: adjacentWhere,
+  });
 
   useEffect(() => {
     if (!requestData) {
@@ -383,9 +392,19 @@ export default function RequestDetailPage() {
     }
   };
 
+  const handleNavigateAdjacent = (nextRequestId: string | undefined) => {
+    if (!nextRequestId) return;
+
+    navigate({
+      to: '/project/requests/$requestId',
+      params: { requestId: nextRequestId },
+      search: currentSearch,
+    });
+  };
   return (
     <div className='flex h-full flex-col'>
       <Header className='bg-background/95 supports-[backdrop-filter]:bg-background/60 border-b backdrop-blur'>
+<<<<<<< HEAD
         <div className='flex items-center space-x-4'>
           <Button variant='ghost' size='sm' onClick={handleBack} className='hover:bg-accent'>
             <ArrowLeft className='mr-2 h-4 w-4' />
@@ -416,15 +435,91 @@ export default function RequestDetailPage() {
                   </TooltipTrigger>
                   <TooltipContent>{t('requests.actions.copyRequestId')}</TooltipContent>
                 </Tooltip>
-              </div>
-              {request && (
-                <div className='mt-1 flex items-center gap-2'>
-                  <p className='text-muted-foreground text-sm'>{request.modelID || t('requests.columns.unknown')}</p>
-                  <span className='text-muted-foreground text-xs'>•</span>
-                  <p className='text-muted-foreground text-xs'>{format(new Date(request.createdAt), 'yyyy-MM-dd HH:mm:ss')}</p>
-                </div>
-              )}
+||||||| parent of bf1109bee (feat: add request detail navigation)
+        <div className='flex items-center space-x-4'>
+          <Button variant='ghost' size='sm' onClick={handleBack} className='hover:bg-accent'>
+            <ArrowLeft className='mr-2 h-4 w-4' />
+            {t('common.back')}
+          </Button>
+          <Separator orientation='vertical' className='h-6' />
+          <div className='flex items-center space-x-3'>
+            <div className='bg-primary/10 flex h-8 w-8 items-center justify-center rounded-lg'>
+              <FileText className='text-primary h-4 w-4' />
             </div>
+            <div>
+              <div className='flex items-center gap-1'>
+                <h1 className='text-lg leading-none font-semibold'>
+                  {t('requests.detail.title')} #
+                  {request ? extractNumberID(request.id) || request.id : extractNumberID(requestId) || requestId}
+                </h1>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant='ghost' size='icon-sm' className='h-7 w-7' onClick={() => void copyRequestID()} aria-label={t('requests.actions.copyRequestId')}>
+                      <Copy className='h-3.5 w-3.5' />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('requests.actions.copyRequestId')}</TooltipContent>
+                </Tooltip>
+=======
+        <div className='flex w-full flex-wrap items-center justify-between gap-3'>
+          <div className='flex min-w-0 items-center space-x-4'>
+            <Button variant='ghost' size='sm' onClick={handleBack} className='hover:bg-accent'>
+              <ArrowLeft className='mr-2 h-4 w-4' />
+              {t('common.back')}
+            </Button>
+            <Separator orientation='vertical' className='h-6' />
+            <div className='flex min-w-0 items-center space-x-3'>
+              <div className='bg-primary/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg'>
+                <FileText className='text-primary h-4 w-4' />
+>>>>>>> bf1109bee (feat: add request detail navigation)
+              </div>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-1'>
+                  <h1 className='truncate text-lg leading-none font-semibold'>
+                    {t('requests.detail.title')} #
+                    {request ? extractNumberID(request.id) || request.id : extractNumberID(requestId) || requestId}
+                  </h1>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant='ghost' size='icon-sm' className='h-7 w-7' onClick={() => void copyRequestID()} aria-label={t('requests.actions.copyRequestId')}>
+                        <Copy className='h-3.5 w-3.5' />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('requests.actions.copyRequestId')}</TooltipContent>
+                  </Tooltip>
+                </div>
+                {request && (
+                  <div className='mt-1 flex min-w-0 items-center gap-2'>
+                    <p className='text-muted-foreground truncate text-sm'>{request.modelID || t('requests.columns.unknown')}</p>
+                    <span className='text-muted-foreground text-xs'>•</span>
+                    <p className='text-muted-foreground shrink-0 text-xs'>{format(new Date(request.createdAt), 'yyyy-MM-dd HH:mm:ss')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className='flex shrink-0 items-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => handleNavigateAdjacent(adjacentRequests?.previous?.id)}
+              disabled={isAdjacentLoading || !adjacentRequests?.previous}
+              title={t('requests.detail.previous')}
+            >
+              <ChevronLeft className='mr-2 h-4 w-4' />
+              {t('requests.detail.previous')}
+            </Button>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => handleNavigateAdjacent(adjacentRequests?.next?.id)}
+              disabled={isAdjacentLoading || !adjacentRequests?.next}
+              title={t('requests.detail.next')}
+            >
+              {t('requests.detail.next')}
+              <ChevronRight className='ml-2 h-4 w-4' />
+            </Button>
           </div>
         </div>
       </Header>
