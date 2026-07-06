@@ -159,6 +159,12 @@ func isReasoningSignatureEvent(resp *llm.Response) bool {
 		return false
 	}
 
+	// If any choice has a FinishReason, this is a terminal chunk (e.g. final Gemini
+	// stream event with empty text + thoughtSignature + finishReason). Do NOT skip it.
+	if resp.Choices[0].FinishReason != nil {
+		return false
+	}
+
 	delta := resp.Choices[0].Delta
 	if delta == nil {
 		return false

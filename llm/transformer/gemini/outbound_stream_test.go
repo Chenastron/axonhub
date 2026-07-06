@@ -812,6 +812,72 @@ func TestOutboundTransformer_TransformStreamChunk_FinishReasons(t *testing.T) {
 	}
 }
 
+func TestOutboundTransformer_TransformStream_NormalizesStopAfterToolCall(t *testing.T) {
+	transformer := &OutboundTransformer{
+		config: Config{
+			BaseURL:    DefaultBaseURL,
+			APIVersion: DefaultAPIVersion,
+		},
+	}
+
+	events := []*httpclient.StreamEvent{
+		{
+			Data: mustMarshal(&GenerateContentResponse{
+				ResponseID:   "resp-tool-stop",
+				ModelVersion: "gemini-3.5-flash",
+				Candidates: []*Candidate{
+					{
+						Index: 0,
+						Content: &Content{
+							Role: "model",
+							Parts: []*Part{
+								{
+									FunctionCall: &FunctionCall{
+										ID:   "call-1",
+										Name: "web_search",
+										Args: map[string]any{"query": "glm-5.2"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			Data: mustMarshal(&GenerateContentResponse{
+				ResponseID:   "resp-tool-stop",
+				ModelVersion: "gemini-3.5-flash",
+				Candidates: []*Candidate{
+					{
+						Index: 0,
+						Content: &Content{
+							Role: "model",
+						},
+						FinishReason: "STOP",
+					},
+				},
+			}),
+		},
+	}
+
+	stream, err := transformer.TransformStream(t.Context(), nil, streams.SliceStream(events))
+	require.NoError(t, err)
+
+	var responses []*llm.Response
+	for stream.Next() {
+		if resp := stream.Current(); resp != nil && resp.Object != "[DONE]" {
+			responses = append(responses, resp)
+		}
+	}
+	require.NoError(t, stream.Err())
+	require.Len(t, responses, 2)
+
+	require.Len(t, responses[0].Choices[0].Delta.ToolCalls, 1)
+	require.NotNil(t, responses[1].Choices[0].FinishReason)
+	require.Equal(t, "tool_calls", *responses[1].Choices[0].FinishReason)
+}
+
 func TestOutboundTransformer_StreamTransformation_WithTestData(t *testing.T) {
 	transformer := &OutboundTransformer{
 		config: Config{

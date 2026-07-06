@@ -16,6 +16,7 @@ import (
 type streamState struct {
 	toolCallIndex int
 	responseID    string
+	hasToolCall   bool
 }
 
 // TransformStream transforms the HTTP stream response to the unified response format.
@@ -76,9 +77,42 @@ func (t *OutboundTransformer) transformStreamChunkWithState(
 
 	// Convert to unified response format (streaming) with tool call index tracking
 	llmResp, nextIndex := convertGeminiToLLMResponseWithState(&resp, true, state.toolCallIndex)
+	if hasStreamToolCall(llmResp) {
+		state.hasToolCall = true
+	}
+	if state.hasToolCall {
+		normalizeStreamToolCallFinishReason(llmResp)
+	}
 	state.toolCallIndex = nextIndex
 
 	return llmResp, nil
+}
+
+func hasStreamToolCall(resp *llm.Response) bool {
+	if resp == nil {
+		return false
+	}
+
+	for _, choice := range resp.Choices {
+		if choice.Delta != nil && len(choice.Delta.ToolCalls) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func normalizeStreamToolCallFinishReason(resp *llm.Response) {
+	if resp == nil {
+		return
+	}
+
+	for i := range resp.Choices {
+		finishReason := resp.Choices[i].FinishReason
+		if finishReason != nil && *finishReason == "stop" {
+			resp.Choices[i].FinishReason = lo.ToPtr("tool_calls")
+		}
+	}
 }
 
 // AggregateStreamChunks aggregates Gemini streaming response chunks into a complete response.
