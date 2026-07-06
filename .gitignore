@@ -171,6 +171,13 @@ config.schema.json
 .omx/
 deploy_dev.sh
 
+start.sh
+stop.sh
+
+# Patches and temporary patch folders
+/patches/
+*.patch
+
 docs/superpowers/
 docs/superpowers/**
 superpowers/
