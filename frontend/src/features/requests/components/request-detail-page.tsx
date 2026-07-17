@@ -404,63 +404,6 @@ export default function RequestDetailPage() {
   return (
     <div className='flex h-full flex-col'>
       <Header className='bg-background/95 supports-[backdrop-filter]:bg-background/60 border-b backdrop-blur'>
-<<<<<<< HEAD
-        <div className='flex items-center space-x-4'>
-          <Button variant='ghost' size='sm' onClick={handleBack} className='hover:bg-accent'>
-            <ArrowLeft className='mr-2 h-4 w-4' />
-            {t('common.back')}
-          </Button>
-          <Separator orientation='vertical' className='h-6' />
-          <div className='flex items-center space-x-3'>
-            <div className='bg-primary/10 flex h-8 w-8 items-center justify-center rounded-lg'>
-              <FileText className='text-primary h-4 w-4' />
-            </div>
-            <div>
-              <div className='flex items-center gap-1'>
-                <h1 className='text-lg leading-none font-semibold'>
-                  {t('requests.detail.title')} #
-                  {request ? extractNumberID(request.id) || request.id : extractNumberID(requestId) || requestId}
-                </h1>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant='ghost'
-                      size='icon-sm'
-                      className='h-7 w-7'
-                      onClick={() => void copyRequestID()}
-                      aria-label={t('requests.actions.copyRequestId')}
-                    >
-                      <Copy className='h-3.5 w-3.5' />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('requests.actions.copyRequestId')}</TooltipContent>
-                </Tooltip>
-||||||| parent of bf1109bee (feat: add request detail navigation)
-        <div className='flex items-center space-x-4'>
-          <Button variant='ghost' size='sm' onClick={handleBack} className='hover:bg-accent'>
-            <ArrowLeft className='mr-2 h-4 w-4' />
-            {t('common.back')}
-          </Button>
-          <Separator orientation='vertical' className='h-6' />
-          <div className='flex items-center space-x-3'>
-            <div className='bg-primary/10 flex h-8 w-8 items-center justify-center rounded-lg'>
-              <FileText className='text-primary h-4 w-4' />
-            </div>
-            <div>
-              <div className='flex items-center gap-1'>
-                <h1 className='text-lg leading-none font-semibold'>
-                  {t('requests.detail.title')} #
-                  {request ? extractNumberID(request.id) || request.id : extractNumberID(requestId) || requestId}
-                </h1>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant='ghost' size='icon-sm' className='h-7 w-7' onClick={() => void copyRequestID()} aria-label={t('requests.actions.copyRequestId')}>
-                      <Copy className='h-3.5 w-3.5' />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('requests.actions.copyRequestId')}</TooltipContent>
-                </Tooltip>
-=======
         <div className='flex w-full flex-wrap items-center justify-between gap-3'>
           <div className='flex min-w-0 items-center space-x-4'>
             <Button variant='ghost' size='sm' onClick={handleBack} className='hover:bg-accent'>
@@ -471,7 +414,6 @@ export default function RequestDetailPage() {
             <div className='flex min-w-0 items-center space-x-3'>
               <div className='bg-primary/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg'>
                 <FileText className='text-primary h-4 w-4' />
->>>>>>> bf1109bee (feat: add request detail navigation)
               </div>
               <div className='min-w-0'>
                 <div className='flex items-center gap-1'>
