@@ -462,6 +462,45 @@ export const channelSchema = z.object({
 });
 export type Channel = z.infer<typeof channelSchema>;
 
+export const channelModelCandidateChannelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: channelStatusSchema,
+});
+
+export const channelModelCandidateSchema = z.object({
+  modelID: z.string(),
+  channels: z.array(channelModelCandidateChannelSchema),
+});
+
+export const channelModelDiscoveryFailureSchema = z.object({
+  channelID: z.string(),
+  channelName: z.string(),
+  error: z.string(),
+});
+
+export const channelModelDiscoveryResultSchema = z.object({
+  scanned: z.number(),
+  succeeded: z.number(),
+  candidates: z.array(channelModelCandidateSchema),
+  failures: z.array(channelModelDiscoveryFailureSchema),
+});
+
+export type ChannelModelCandidate = z.infer<typeof channelModelCandidateSchema>;
+export type ChannelModelDiscoveryResult = z.infer<typeof channelModelDiscoveryResultSchema>;
+
+export const bulkAddChannelModelsPayloadSchema = z.object({
+  selectedModels: z.number(),
+  updatedChannels: z.number(),
+  addedAssociations: z.number(),
+});
+
+export type BulkAddChannelModelsPayload = z.infer<typeof bulkAddChannelModelsPayloadSchema>;
+export interface ChannelModelAddSelectionInput {
+  modelID: string;
+  channelIDs: string[];
+}
+
 // Simplified schema for saveChannelEndpoints mutation response
 export const channelEndpointsResponseSchema = z.object({
   id: z.string(),

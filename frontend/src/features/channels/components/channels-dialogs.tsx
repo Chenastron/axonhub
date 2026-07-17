@@ -5,6 +5,7 @@ import { ChannelsActionDialog } from './channels-action-dialog';
 import { ChannelsAPIKeyManagementDialog } from './channels-api-key-management-dialog';
 import { ChannelsArchiveDialog } from './channels-archive-dialog';
 import { ChannelsAvailabilityDialog } from './channels-availability-dialog';
+import { ChannelsBulkAddModelsDialog } from './channels-bulk-add-models-dialog';
 import { ChannelsBulkApplyTemplateDialog } from './channels-bulk-apply-template-dialog';
 import { ChannelsBulkArchiveDialog } from './channels-bulk-archive-dialog';
 import { ChannelsBulkAutoDisableDialog } from './channels-bulk-auto-disable-dialog';
@@ -28,6 +29,7 @@ import { ChannelsRateLimitDialog } from './channels-rate-limit-dialog';
 import { ChannelsStatusDialog } from './channels-status-dialog';
 import { ChannelsSystemSettingsDialog } from './channels-system-settings-dialog';
 import { ChannelsTemplateManagerDialog } from './channels-template-manager-dialog';
+import { ChannelsTestAPIKeysDialog } from './channels-test-api-keys-dialog';
 import { ChannelsTestDialog } from './channels-test-dialog';
 import { ChannelsTestHistoryDrawer } from './channels-test-history-drawer';
 import { ChannelsTransformOptionsDialog } from './channels-transform-options-dialog';
@@ -88,6 +90,8 @@ export function ChannelsDialogs() {
       <ChannelsBulkImportDialog isOpen={open === 'bulkImport'} onClose={() => setOpen(null)} />
 
       <ChannelsBulkOrderingDialog open={open === 'bulkOrdering'} onOpenChange={(isOpen) => setOpen(isOpen ? 'bulkOrdering' : null)} />
+
+      <ChannelsBulkAddModelsDialog />
 
       {currentRow && (
         <>

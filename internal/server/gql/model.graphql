@@ -212,12 +212,48 @@ type UnassociatedChannel {
   models: [String!]!
 }
 
+type ChannelModelCandidateChannel {
+  id: ID!
+  name: String!
+  status: ChannelStatus!
+}
+
+type ChannelModelCandidate {
+  modelID: String!
+  channels: [ChannelModelCandidateChannel!]!
+}
+
+type ChannelModelDiscoveryFailure {
+  channelID: ID!
+  channelName: String!
+  error: String!
+}
+
+type ChannelModelDiscoveryResult {
+  scanned: Int!
+  succeeded: Int!
+  candidates: [ChannelModelCandidate!]!
+  failures: [ChannelModelDiscoveryFailure!]!
+}
+
+input ChannelModelAddSelectionInput {
+  modelID: String!
+  channelIDs: [ID!]!
+}
+
+type BulkAddChannelModelsPayload {
+  selectedModels: Int!
+  updatedChannels: Int!
+  addedAssociations: Int!
+}
+
 extend type Model {
   associatedChannelCount: Int! @goField(forceResolver: true)
 }
 
 extend type Query {
   fetchModels(input: FetchModelsInput!): FetchModelsPayload!
+  discoverChannelModelCandidates(modelName: String!): ChannelModelDiscoveryResult!
   queryModels(input: QueryModelsInput!): [ModelIdentityWithStatus!]!
   queryModelChannelConnections(
     associations: [ModelAssociationInput!]!
@@ -234,5 +270,6 @@ extend type Mutation {
   bulkArchiveModels(ids: [ID!]!): Boolean!
   bulkDisableModels(ids: [ID!]!): Boolean!
   bulkEnableModels(ids: [ID!]!): Boolean!
+  bulkAddChannelModels(selections: [ChannelModelAddSelectionInput!]!): BulkAddChannelModelsPayload!
   bulkDeleteModels(ids: [ID!]!): Boolean!
 }

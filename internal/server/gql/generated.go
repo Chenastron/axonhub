@@ -69,6 +69,8 @@ type ResolverRoot interface {
 	APIKey() APIKeyResolver
 	APIKeyProfileTemplate() APIKeyProfileTemplateResolver
 	Channel() ChannelResolver
+	ChannelModelCandidateChannel() ChannelModelCandidateChannelResolver
+	ChannelModelDiscoveryFailure() ChannelModelDiscoveryFailureResolver
 	ChannelModelPrice() ChannelModelPriceResolver
 	ChannelModelPriceVersion() ChannelModelPriceVersionResolver
 	ChannelOverrideTemplate() ChannelOverrideTemplateResolver
@@ -325,6 +327,12 @@ type ComplexityRoot struct {
 		Title     func(childComplexity int) int
 	}
 
+	BulkAddChannelModelsPayload struct {
+		AddedAssociations func(childComplexity int) int
+		SelectedModels    func(childComplexity int) int
+		UpdatedChannels   func(childComplexity int) int
+	}
+
 	BulkImportChannelsResult struct {
 		Channels func(childComplexity int) int
 		Created  func(childComplexity int) int
@@ -424,6 +432,30 @@ type ComplexityRoot struct {
 
 	ChannelModelAutoSyncSetting struct {
 		Frequency func(childComplexity int) int
+	}
+
+	ChannelModelCandidate struct {
+		Channels func(childComplexity int) int
+		ModelID  func(childComplexity int) int
+	}
+
+	ChannelModelCandidateChannel struct {
+		ID     func(childComplexity int) int
+		Name   func(childComplexity int) int
+		Status func(childComplexity int) int
+	}
+
+	ChannelModelDiscoveryFailure struct {
+		ChannelID   func(childComplexity int) int
+		ChannelName func(childComplexity int) int
+		Error       func(childComplexity int) int
+	}
+
+	ChannelModelDiscoveryResult struct {
+		Candidates func(childComplexity int) int
+		Failures   func(childComplexity int) int
+		Scanned    func(childComplexity int) int
+		Succeeded  func(childComplexity int) int
 	}
 
 	ChannelModelEntry struct {
@@ -981,6 +1013,7 @@ type ComplexityRoot struct {
 		ArchiveTrace                          func(childComplexity int, id objects.GUID) int
 		Backup                                func(childComplexity int, input backup.BackupOptions) int
 		BulkAddChannelTags                    func(childComplexity int, ids []*objects.GUID, tags []string) int
+		BulkAddChannelModels                  func(childComplexity int, selections []*biz.ChannelModelAddSelectionInput) int
 		BulkArchiveAPIKeys                    func(childComplexity int, ids []*objects.GUID) int
 		BulkArchiveChannels                   func(childComplexity int, ids []*objects.GUID) int
 		BulkArchiveModels                     func(childComplexity int, ids []*objects.GUID) int
@@ -1419,6 +1452,7 @@ type ComplexityRoot struct {
 		DashboardOverview               func(childComplexity int) int
 		DataStorages                    func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, orderBy *ent.DataStorageOrder, where *ent.DataStorageWhereInput) int
 		DefaultDataStorageID            func(childComplexity int) int
+		DiscoverChannelModelCandidates  func(childComplexity int, modelName string) int
 		FastestChannels                 func(childComplexity int, input FastestChannelsInput) int
 		FastestModels                   func(childComplexity int, input FastestChannelsInput) int
 		FetchModels                     func(childComplexity int, input biz.FetchModelsInput) int
@@ -2207,6 +2241,12 @@ type ChannelResolver interface {
 	DisabledAPIKeys(ctx context.Context, obj *ent.Channel) ([]*objects.DisabledAPIKey, error)
 	LiveLimiterStats(ctx context.Context, obj *ent.Channel) (*ChannelLimiterStats, error)
 }
+type ChannelModelCandidateChannelResolver interface {
+	ID(ctx context.Context, obj *biz.ChannelModelCandidateChannel) (*objects.GUID, error)
+}
+type ChannelModelDiscoveryFailureResolver interface {
+	ChannelID(ctx context.Context, obj *biz.ChannelModelDiscoveryFailure) (*objects.GUID, error)
+}
 type ChannelModelPriceResolver interface {
 	ID(ctx context.Context, obj *ent.ChannelModelPrice) (*objects.GUID, error)
 
@@ -2356,6 +2396,7 @@ type MutationResolver interface {
 	BulkArchiveModels(ctx context.Context, ids []*objects.GUID) (bool, error)
 	BulkDisableModels(ctx context.Context, ids []*objects.GUID) (bool, error)
 	BulkEnableModels(ctx context.Context, ids []*objects.GUID) (bool, error)
+	BulkAddChannelModels(ctx context.Context, selections []*biz.ChannelModelAddSelectionInput) (*biz.BulkAddChannelModelsPayload, error)
 	BulkDeleteModels(ctx context.Context, ids []*objects.GUID) (bool, error)
 	Backup(ctx context.Context, input backup.BackupOptions) (*BackupPayload, error)
 	Restore(ctx context.Context, file graphql.Upload, input backup.RestoreOptions) (*RestorePayload, error)
@@ -2478,6 +2519,7 @@ type QueryResolver interface {
 	UsageCostInjectionSettings(ctx context.Context) (*UsageCostInjectionSettings, error)
 	GetCacheDiagnostics(ctx context.Context, input *GetCacheDiagnosticsInput) (*GetCacheDiagnosticsPayload, error)
 	FetchModels(ctx context.Context, input biz.FetchModelsInput) (*FetchModelsPayload, error)
+	DiscoverChannelModelCandidates(ctx context.Context, modelName string) (*biz.ChannelModelDiscoveryResult, error)
 	QueryModels(ctx context.Context, input QueryModelsInput) ([]*biz.ModelIdentityWithStatus, error)
 	QueryModelChannelConnections(ctx context.Context, associations []*objects.ModelAssociation) ([]*biz.ModelChannelConnection, error)
 	QueryUnassociatedChannels(ctx context.Context) ([]*biz.UnassociatedChannel, error)
@@ -3450,6 +3492,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.BrandSettings.Title(childComplexity), true
 
+	case "BulkAddChannelModelsPayload.addedAssociations":
+		if e.complexity.BulkAddChannelModelsPayload.AddedAssociations == nil {
+			break
+		}
+
+		return e.complexity.BulkAddChannelModelsPayload.AddedAssociations(childComplexity), true
+	case "BulkAddChannelModelsPayload.selectedModels":
+		if e.complexity.BulkAddChannelModelsPayload.SelectedModels == nil {
+			break
+		}
+
+		return e.complexity.BulkAddChannelModelsPayload.SelectedModels(childComplexity), true
+	case "BulkAddChannelModelsPayload.updatedChannels":
+		if e.complexity.BulkAddChannelModelsPayload.UpdatedChannels == nil {
+			break
+		}
+
+		return e.complexity.BulkAddChannelModelsPayload.UpdatedChannels(childComplexity), true
+
 	case "BulkImportChannelsResult.channels":
 		if e.complexity.BulkImportChannelsResult.Channels == nil {
 			break
@@ -3866,6 +3927,82 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChannelModelAutoSyncSetting.Frequency(childComplexity), true
+
+	case "ChannelModelCandidate.channels":
+		if e.complexity.ChannelModelCandidate.Channels == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelCandidate.Channels(childComplexity), true
+	case "ChannelModelCandidate.modelID":
+		if e.complexity.ChannelModelCandidate.ModelID == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelCandidate.ModelID(childComplexity), true
+
+	case "ChannelModelCandidateChannel.id":
+		if e.complexity.ChannelModelCandidateChannel.ID == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelCandidateChannel.ID(childComplexity), true
+	case "ChannelModelCandidateChannel.name":
+		if e.complexity.ChannelModelCandidateChannel.Name == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelCandidateChannel.Name(childComplexity), true
+	case "ChannelModelCandidateChannel.status":
+		if e.complexity.ChannelModelCandidateChannel.Status == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelCandidateChannel.Status(childComplexity), true
+
+	case "ChannelModelDiscoveryFailure.channelID":
+		if e.complexity.ChannelModelDiscoveryFailure.ChannelID == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryFailure.ChannelID(childComplexity), true
+	case "ChannelModelDiscoveryFailure.channelName":
+		if e.complexity.ChannelModelDiscoveryFailure.ChannelName == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryFailure.ChannelName(childComplexity), true
+	case "ChannelModelDiscoveryFailure.error":
+		if e.complexity.ChannelModelDiscoveryFailure.Error == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryFailure.Error(childComplexity), true
+
+	case "ChannelModelDiscoveryResult.candidates":
+		if e.complexity.ChannelModelDiscoveryResult.Candidates == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryResult.Candidates(childComplexity), true
+	case "ChannelModelDiscoveryResult.failures":
+		if e.complexity.ChannelModelDiscoveryResult.Failures == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryResult.Failures(childComplexity), true
+	case "ChannelModelDiscoveryResult.scanned":
+		if e.complexity.ChannelModelDiscoveryResult.Scanned == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryResult.Scanned(childComplexity), true
+	case "ChannelModelDiscoveryResult.succeeded":
+		if e.complexity.ChannelModelDiscoveryResult.Succeeded == nil {
+			break
+		}
+
+		return e.complexity.ChannelModelDiscoveryResult.Succeeded(childComplexity), true
 
 	case "ChannelModelEntry.actualModel":
 		if e.complexity.ChannelModelEntry.ActualModel == nil {
@@ -5905,6 +6042,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.BulkAddChannelTags(childComplexity, args["ids"].([]*objects.GUID), args["tags"].([]string)), true
+	case "Mutation.bulkAddChannelModels":
+		if e.complexity.Mutation.BulkAddChannelModels == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_bulkAddChannelModels_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.BulkAddChannelModels(childComplexity, args["selections"].([]*biz.ChannelModelAddSelectionInput)), true
 	case "Mutation.bulkArchiveAPIKeys":
 		if e.complexity.Mutation.BulkArchiveAPIKeys == nil {
 			break
@@ -8576,6 +8724,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.DefaultDataStorageID(childComplexity), true
+	case "Query.discoverChannelModelCandidates":
+		if e.complexity.Query.DiscoverChannelModelCandidates == nil {
+			break
+		}
+
+		args, err := ec.field_Query_discoverChannelModelCandidates_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.DiscoverChannelModelCandidates(childComplexity, args["modelName"].(string)), true
 	case "Query.fastestChannels":
 		if e.complexity.Query.FastestChannels == nil {
 			break
@@ -11871,6 +12030,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputBulkUpdateChannelOrderingInput,
 		ec.unmarshalInputChannelCredentialsInput,
 		ec.unmarshalInputChannelEndpointInput,
+		ec.unmarshalInputChannelModelAddSelectionInput,
 		ec.unmarshalInputChannelModelAssociationInput,
 		ec.unmarshalInputChannelModelPriceOrder,
 		ec.unmarshalInputChannelModelPriceVersionOrder,
@@ -12474,6 +12634,17 @@ func (ec *executionContext) field_Mutation_bulkAddChannelTags_args(ctx context.C
 		return nil, err
 	}
 	args["tags"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_bulkAddChannelModels_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "selections", ec.unmarshalNChannelModelAddSelectionInput2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInputᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["selections"] = arg0
 	return args, nil
 }
 
@@ -14653,6 +14824,17 @@ func (ec *executionContext) field_Query_dataStorages_args(ctx context.Context, r
 		return nil, err
 	}
 	args["where"] = arg5
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_discoverChannelModelCandidates_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "modelName", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["modelName"] = arg0
 	return args, nil
 }
 
@@ -20039,6 +20221,93 @@ func (ec *executionContext) fieldContext_BrandSettings_title(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _BulkAddChannelModelsPayload_selectedModels(ctx context.Context, field graphql.CollectedField, obj *biz.BulkAddChannelModelsPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_BulkAddChannelModelsPayload_selectedModels,
+		func(ctx context.Context) (any, error) {
+			return obj.SelectedModels, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_BulkAddChannelModelsPayload_selectedModels(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BulkAddChannelModelsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BulkAddChannelModelsPayload_updatedChannels(ctx context.Context, field graphql.CollectedField, obj *biz.BulkAddChannelModelsPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_BulkAddChannelModelsPayload_updatedChannels,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedChannels, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_BulkAddChannelModelsPayload_updatedChannels(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BulkAddChannelModelsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BulkAddChannelModelsPayload_addedAssociations(ctx context.Context, field graphql.CollectedField, obj *biz.BulkAddChannelModelsPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_BulkAddChannelModelsPayload_addedAssociations,
+		func(ctx context.Context) (any, error) {
+			return obj.AddedAssociations, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_BulkAddChannelModelsPayload_addedAssociations(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BulkAddChannelModelsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _BulkImportChannelsResult_success(ctx context.Context, field graphql.CollectedField, obj *biz.BulkImportChannelsResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -22451,6 +22720,376 @@ func (ec *executionContext) fieldContext_ChannelModelAutoSyncSetting_frequency(_
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type AutoSyncFrequency does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelCandidate_modelID(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelCandidate) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelCandidate_modelID,
+		func(ctx context.Context) (any, error) {
+			return obj.ModelID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelCandidate_modelID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelCandidate",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelCandidate_channels(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelCandidate) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelCandidate_channels,
+		func(ctx context.Context) (any, error) {
+			return obj.Channels, nil
+		},
+		nil,
+		ec.marshalNChannelModelCandidateChannel2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidateChannelᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelCandidate_channels(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelCandidate",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ChannelModelCandidateChannel_id(ctx, field)
+			case "name":
+				return ec.fieldContext_ChannelModelCandidateChannel_name(ctx, field)
+			case "status":
+				return ec.fieldContext_ChannelModelCandidateChannel_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChannelModelCandidateChannel", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelCandidateChannel_id(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelCandidateChannel) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelCandidateChannel_id,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.ChannelModelCandidateChannel().ID(ctx, obj)
+		},
+		nil,
+		ec.marshalNID2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐGUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelCandidateChannel_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelCandidateChannel",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelCandidateChannel_name(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelCandidateChannel) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelCandidateChannel_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelCandidateChannel_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelCandidateChannel",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelCandidateChannel_status(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelCandidateChannel) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelCandidateChannel_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNChannelStatus2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋentᚋchannelᚐStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelCandidateChannel_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelCandidateChannel",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ChannelStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryFailure_channelID(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryFailure) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryFailure_channelID,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.ChannelModelDiscoveryFailure().ChannelID(ctx, obj)
+		},
+		nil,
+		ec.marshalNID2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐGUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryFailure_channelID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryFailure",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryFailure_channelName(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryFailure) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryFailure_channelName,
+		func(ctx context.Context) (any, error) {
+			return obj.ChannelName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryFailure_channelName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryFailure",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryFailure_error(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryFailure) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryFailure_error,
+		func(ctx context.Context) (any, error) {
+			return obj.Error, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryFailure_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryFailure",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryResult_scanned(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryResult_scanned,
+		func(ctx context.Context) (any, error) {
+			return obj.Scanned, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryResult_scanned(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryResult_succeeded(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryResult_succeeded,
+		func(ctx context.Context) (any, error) {
+			return obj.Succeeded, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryResult_succeeded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryResult_candidates(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryResult_candidates,
+		func(ctx context.Context) (any, error) {
+			return obj.Candidates, nil
+		},
+		nil,
+		ec.marshalNChannelModelCandidate2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidateᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryResult_candidates(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "modelID":
+				return ec.fieldContext_ChannelModelCandidate_modelID(ctx, field)
+			case "channels":
+				return ec.fieldContext_ChannelModelCandidate_channels(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChannelModelCandidate", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelModelDiscoveryResult_failures(ctx context.Context, field graphql.CollectedField, obj *biz.ChannelModelDiscoveryResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelModelDiscoveryResult_failures,
+		func(ctx context.Context) (any, error) {
+			return obj.Failures, nil
+		},
+		nil,
+		ec.marshalNChannelModelDiscoveryFailure2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryFailureᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelModelDiscoveryResult_failures(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelModelDiscoveryResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "channelID":
+				return ec.fieldContext_ChannelModelDiscoveryFailure_channelID(ctx, field)
+			case "channelName":
+				return ec.fieldContext_ChannelModelDiscoveryFailure_channelName(ctx, field)
+			case "error":
+				return ec.fieldContext_ChannelModelDiscoveryFailure_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChannelModelDiscoveryFailure", field.Name)
 		},
 	}
 	return fc, nil
@@ -38410,6 +39049,55 @@ func (ec *executionContext) fieldContext_Mutation_bulkEnableModels(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_bulkAddChannelModels(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_bulkAddChannelModels,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().BulkAddChannelModels(ctx, fc.Args["selections"].([]*biz.ChannelModelAddSelectionInput))
+		},
+		nil,
+		ec.marshalNBulkAddChannelModelsPayload2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_bulkAddChannelModels(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "selectedModels":
+				return ec.fieldContext_BulkAddChannelModelsPayload_selectedModels(ctx, field)
+			case "updatedChannels":
+				return ec.fieldContext_BulkAddChannelModelsPayload_updatedChannels(ctx, field)
+			case "addedAssociations":
+				return ec.fieldContext_BulkAddChannelModelsPayload_addedAssociations(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type BulkAddChannelModelsPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_bulkAddChannelModels_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_bulkDeleteModels(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -48168,6 +48856,57 @@ func (ec *executionContext) fieldContext_Query_fetchModels(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_fetchModels_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_discoverChannelModelCandidates(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_discoverChannelModelCandidates,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().DiscoverChannelModelCandidates(ctx, fc.Args["modelName"].(string))
+		},
+		nil,
+		ec.marshalNChannelModelDiscoveryResult2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_discoverChannelModelCandidates(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "scanned":
+				return ec.fieldContext_ChannelModelDiscoveryResult_scanned(ctx, field)
+			case "succeeded":
+				return ec.fieldContext_ChannelModelDiscoveryResult_succeeded(ctx, field)
+			case "candidates":
+				return ec.fieldContext_ChannelModelDiscoveryResult_candidates(ctx, field)
+			case "failures":
+				return ec.fieldContext_ChannelModelDiscoveryResult_failures(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChannelModelDiscoveryResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_discoverChannelModelCandidates_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -67093,6 +67832,44 @@ func (ec *executionContext) unmarshalInputChannelEndpointInput(ctx context.Conte
 				return it, err
 			}
 			it.Transport = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputChannelModelAddSelectionInput(ctx context.Context, obj any) (biz.ChannelModelAddSelectionInput, error) {
+	var it biz.ChannelModelAddSelectionInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"modelID", "channelIDs"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "modelID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("modelID"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ModelID = data
+		case "channelIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("channelIDs"))
+			data, err := ec.unmarshalNID2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐGUIDᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			converted, err := objects.ConvertGUIDPtrsToInts(data)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			it.ChannelIDs = converted
 		}
 	}
 
@@ -93918,6 +94695,55 @@ func (ec *executionContext) _BrandSettings(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var bulkAddChannelModelsPayloadImplementors = []string{"BulkAddChannelModelsPayload"}
+
+func (ec *executionContext) _BulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, obj *biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, bulkAddChannelModelsPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BulkAddChannelModelsPayload")
+		case "selectedModels":
+			out.Values[i] = ec._BulkAddChannelModelsPayload_selectedModels(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedChannels":
+			out.Values[i] = ec._BulkAddChannelModelsPayload_updatedChannels(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "addedAssociations":
+			out.Values[i] = ec._BulkAddChannelModelsPayload_addedAssociations(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var bulkImportChannelsResultImplementors = []string{"BulkImportChannelsResult"}
 
 func (ec *executionContext) _BulkImportChannelsResult(ctx context.Context, sel ast.SelectionSet, obj *biz.BulkImportChannelsResult) graphql.Marshaler {
@@ -94978,6 +95804,264 @@ func (ec *executionContext) _ChannelModelAutoSyncSetting(ctx context.Context, se
 			out.Values[i] = graphql.MarshalString("ChannelModelAutoSyncSetting")
 		case "frequency":
 			out.Values[i] = ec._ChannelModelAutoSyncSetting_frequency(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var channelModelCandidateImplementors = []string{"ChannelModelCandidate"}
+
+func (ec *executionContext) _ChannelModelCandidate(ctx context.Context, sel ast.SelectionSet, obj *biz.ChannelModelCandidate) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, channelModelCandidateImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChannelModelCandidate")
+		case "modelID":
+			out.Values[i] = ec._ChannelModelCandidate_modelID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "channels":
+			out.Values[i] = ec._ChannelModelCandidate_channels(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var channelModelCandidateChannelImplementors = []string{"ChannelModelCandidateChannel"}
+
+func (ec *executionContext) _ChannelModelCandidateChannel(ctx context.Context, sel ast.SelectionSet, obj *biz.ChannelModelCandidateChannel) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, channelModelCandidateChannelImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChannelModelCandidateChannel")
+		case "id":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ChannelModelCandidateChannel_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "name":
+			out.Values[i] = ec._ChannelModelCandidateChannel_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "status":
+			out.Values[i] = ec._ChannelModelCandidateChannel_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var channelModelDiscoveryFailureImplementors = []string{"ChannelModelDiscoveryFailure"}
+
+func (ec *executionContext) _ChannelModelDiscoveryFailure(ctx context.Context, sel ast.SelectionSet, obj *biz.ChannelModelDiscoveryFailure) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, channelModelDiscoveryFailureImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChannelModelDiscoveryFailure")
+		case "channelID":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ChannelModelDiscoveryFailure_channelID(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "channelName":
+			out.Values[i] = ec._ChannelModelDiscoveryFailure_channelName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "error":
+			out.Values[i] = ec._ChannelModelDiscoveryFailure_error(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var channelModelDiscoveryResultImplementors = []string{"ChannelModelDiscoveryResult"}
+
+func (ec *executionContext) _ChannelModelDiscoveryResult(ctx context.Context, sel ast.SelectionSet, obj *biz.ChannelModelDiscoveryResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, channelModelDiscoveryResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChannelModelDiscoveryResult")
+		case "scanned":
+			out.Values[i] = ec._ChannelModelDiscoveryResult_scanned(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "succeeded":
+			out.Values[i] = ec._ChannelModelDiscoveryResult_succeeded(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "candidates":
+			out.Values[i] = ec._ChannelModelDiscoveryResult_candidates(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failures":
+			out.Values[i] = ec._ChannelModelDiscoveryResult_failures(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -100469,6 +101553,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "bulkAddChannelModels":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_bulkAddChannelModels(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "bulkDeleteModels":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_bulkDeleteModels(ctx, field)
@@ -104925,6 +106016,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_fetchModels(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "discoverChannelModelCandidates":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_discoverChannelModelCandidates(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -113478,6 +114591,20 @@ func (ec *executionContext) marshalNBulkAutoDisableAction2githubᚗcomᚋlooplj�
 	return res
 }
 
+func (ec *executionContext) marshalNBulkAddChannelModelsPayload2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	return ec._BulkAddChannelModelsPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBulkAddChannelModelsPayload2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v *biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BulkAddChannelModelsPayload(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBulkCreateChannelsInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkCreateChannelsInput(ctx context.Context, v any) (biz.BulkCreateChannelsInput, error) {
 	res, err := ec.unmarshalInputBulkCreateChannelsInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -113729,8 +114856,204 @@ func (ec *executionContext) unmarshalNChannelEndpointInput2ᚕgithubᚗcomᚋloo
 	return res, nil
 }
 
+func (ec *executionContext) unmarshalNChannelModelAddSelectionInput2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInputᚄ(ctx context.Context, v any) ([]*biz.ChannelModelAddSelectionInput, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*biz.ChannelModelAddSelectionInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChannelModelAddSelectionInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNChannelModelAddSelectionInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInput(ctx context.Context, v any) (*biz.ChannelModelAddSelectionInput, error) {
+	res, err := ec.unmarshalInputChannelModelAddSelectionInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNChannelModelAutoSyncSetting2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAutoSyncSetting(ctx context.Context, sel ast.SelectionSet, v biz.ChannelModelAutoSyncSetting) graphql.Marshaler {
 	return ec._ChannelModelAutoSyncSetting(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNChannelModelCandidate2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidateᚄ(ctx context.Context, sel ast.SelectionSet, v []*biz.ChannelModelCandidate) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChannelModelCandidate2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidate(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNChannelModelCandidate2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidate(ctx context.Context, sel ast.SelectionSet, v *biz.ChannelModelCandidate) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChannelModelCandidate(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNChannelModelCandidateChannel2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidateChannelᚄ(ctx context.Context, sel ast.SelectionSet, v []*biz.ChannelModelCandidateChannel) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChannelModelCandidateChannel2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidateChannel(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNChannelModelCandidateChannel2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelCandidateChannel(ctx context.Context, sel ast.SelectionSet, v *biz.ChannelModelCandidateChannel) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChannelModelCandidateChannel(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNChannelModelDiscoveryFailure2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryFailureᚄ(ctx context.Context, sel ast.SelectionSet, v []*biz.ChannelModelDiscoveryFailure) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChannelModelDiscoveryFailure2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryFailure(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNChannelModelDiscoveryFailure2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryFailure(ctx context.Context, sel ast.SelectionSet, v *biz.ChannelModelDiscoveryFailure) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChannelModelDiscoveryFailure(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNChannelModelDiscoveryResult2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryResult(ctx context.Context, sel ast.SelectionSet, v biz.ChannelModelDiscoveryResult) graphql.Marshaler {
+	return ec._ChannelModelDiscoveryResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNChannelModelDiscoveryResult2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryResult(ctx context.Context, sel ast.SelectionSet, v *biz.ChannelModelDiscoveryResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChannelModelDiscoveryResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNChannelModelEntry2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelEntry(ctx context.Context, sel ast.SelectionSet, v biz.ChannelModelEntry) graphql.Marshaler {

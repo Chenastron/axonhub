@@ -208,6 +208,9 @@ models:
   BulkAutoDisableAction:
     model:
       - github.com/looplj/axonhub/internal/server/biz.BulkAutoDisableAction
+  ChannelModelAddSelectionInput:
+    model:
+      - github.com/looplj/axonhub/internal/server/biz.ChannelModelAddSelectionInput
   SaveChannelEndpointsInput:
     model:
       - github.com/looplj/axonhub/internal/server/biz.SaveChannelEndpointsInput

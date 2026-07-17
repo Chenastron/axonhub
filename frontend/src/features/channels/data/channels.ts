@@ -42,6 +42,11 @@ import {
   testAPIKeyResultSchema,
   DetectedChannelEndpoint,
   detectedChannelEndpointSchema,
+  ChannelModelAddSelectionInput,
+  ChannelModelDiscoveryResult,
+  channelModelDiscoveryResultSchema,
+  BulkAddChannelModelsPayload,
+  bulkAddChannelModelsPayloadSchema,
 } from './schema';
 
 const QUERY_CHANNEL_NAMES_QUERY = `
@@ -967,6 +972,38 @@ const FETCH_MODELS_QUERY = `
         id
       }
       error
+    }
+  }
+`;
+
+const DISCOVER_CHANNEL_MODEL_CANDIDATES_QUERY = `
+  query DiscoverChannelModelCandidates($modelName: String!) {
+    discoverChannelModelCandidates(modelName: $modelName) {
+      scanned
+      succeeded
+      candidates {
+        modelID
+        channels {
+          id
+          name
+          status
+        }
+      }
+      failures {
+        channelID
+        channelName
+        error
+      }
+    }
+  }
+`;
+
+const BULK_ADD_CHANNEL_MODELS_MUTATION = `
+  mutation BulkAddChannelModels($selections: [ChannelModelAddSelectionInput!]!) {
+    bulkAddChannelModels(selections: $selections) {
+      selectedModels
+      updatedChannels
+      addedAssociations
     }
   }
 `;
@@ -2246,6 +2283,55 @@ export function useFetchModels() {
           toast.success(t('channels.messages.fetchModelsSuccess', { count }));
         }
       }
+    },
+  });
+}
+
+export function useDiscoverChannelModelCandidates() {
+  const { handleError } = useErrorHandler();
+
+  return useMutation({
+    mutationFn: async (modelName: string) => {
+      try {
+        const data = await graphqlRequest<{ discoverChannelModelCandidates: ChannelModelDiscoveryResult }>(
+          DISCOVER_CHANNEL_MODEL_CANDIDATES_QUERY,
+          { modelName }
+        );
+        return channelModelDiscoveryResultSchema.parse(data.discoverChannelModelCandidates);
+      } catch (error) {
+        handleError(error, { context: 'Discover Channel Model Candidates' });
+        throw error;
+      }
+    },
+  });
+}
+
+export function useBulkAddChannelModels() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { handleError } = useErrorHandler();
+
+  return useMutation({
+    mutationFn: async (selections: ChannelModelAddSelectionInput[]) => {
+      try {
+        const data = await graphqlRequest<{ bulkAddChannelModels: BulkAddChannelModelsPayload }>(BULK_ADD_CHANNEL_MODELS_MUTATION, {
+          selections,
+        });
+        return bulkAddChannelModelsPayloadSchema.parse(data.bulkAddChannelModels);
+      } catch (error) {
+        handleError(error, { context: 'Bulk Add Channel Models' });
+        throw error;
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
+      toast.success(
+        t('channels.bulkAddModels.success', {
+          models: data.selectedModels,
+          channels: data.updatedChannels,
+          associations: data.addedAssociations,
+        })
+      );
     },
   });
 }

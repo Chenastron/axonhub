@@ -648,6 +648,95 @@ test.describe('Admin Channels Management', () => {
     }
   })
 
+  test('can discover and bulk add matching channel models', async ({ page }) => {
+    let submittedSelections: Array<{ modelID: string; channelIDs: string[] }> = []
+
+    await page.route('**/admin/graphql', async (route) => {
+      const body = route.request().postDataJSON() as {
+        operationName?: string
+        variables?: Record<string, unknown>
+      }
+
+      if (body.operationName === 'DiscoverChannelModelCandidates') {
+        expect(body.variables?.modelName).toBe('gpt-5.6')
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              discoverChannelModelCandidates: {
+                scanned: 3,
+                succeeded: 2,
+                candidates: [
+                  {
+                    modelID: 'openai/gpt-5-6-thinking',
+                    channels: [
+                      { id: 'gid://axonhub/Channel/101', name: 'Primary OpenAI', status: 'enabled' },
+                      { id: 'gid://axonhub/Channel/102', name: 'Archived OpenAI', status: 'archived' },
+                    ],
+                  },
+                  {
+                    modelID: 'GPT-5-6',
+                    channels: [{ id: 'gid://axonhub/Channel/103', name: 'Backup OpenAI', status: 'disabled' }],
+                  },
+                ],
+                failures: [
+                  { channelID: 'gid://axonhub/Channel/104', channelName: 'Unavailable OpenAI', error: 'upstream timeout' },
+                ],
+              },
+            },
+          }),
+        })
+        return
+      }
+
+      if (body.operationName === 'BulkAddChannelModels') {
+        submittedSelections = body.variables?.selections as Array<{ modelID: string; channelIDs: string[] }>
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              bulkAddChannelModels: {
+                selectedModels: 1,
+                updatedChannels: 1,
+                addedAssociations: 1,
+              },
+            },
+          }),
+        })
+        return
+      }
+
+      await route.continue()
+    })
+
+    await page.getByTestId('bulk-add-channel-models-button').click()
+    const dialog = page.getByTestId('bulk-add-channel-models-dialog')
+    await expect(dialog).toBeVisible()
+
+    await dialog.getByTestId('bulk-add-channel-model-input').fill('gpt-5.6')
+    await dialog.getByTestId('bulk-add-channel-model-search').click()
+
+    await expect(dialog.getByText('openai/gpt-5-6-thinking')).toBeVisible()
+    await expect(dialog.getByText('GPT-5-6', { exact: true })).toBeVisible()
+    await expect(dialog.getByText('Unavailable OpenAI')).toBeVisible()
+    await expect(dialog.getByText('upstream timeout')).toBeVisible()
+
+    await dialog.getByTestId('bulk-add-model-channels-openai/gpt-5-6-thinking').click()
+    await dialog.getByTestId('bulk-add-channel-checkbox-openai/gpt-5-6-thinking-gid://axonhub/Channel/101').click()
+    await expect(dialog.getByTestId('bulk-add-model-checkbox-openai/gpt-5-6-thinking')).toHaveAttribute('data-state', 'indeterminate')
+    await dialog.getByTestId('bulk-add-channel-model-confirm').click()
+
+    await expect(dialog).not.toBeVisible()
+    expect(submittedSelections).toEqual([
+      {
+        modelID: 'openai/gpt-5-6-thinking',
+        channelIDs: ['gid://axonhub/Channel/101'],
+      },
+    ])
+  })
+
   test('can configure model mappings in model mapping dialog', async ({ page }) => {
     // Wait for table to load
     await page.waitForTimeout(2000)

@@ -19,6 +19,16 @@ import (
 	"github.com/samber/lo"
 )
 
+// ID is the resolver for the id field.
+func (r *channelModelCandidateChannelResolver) ID(ctx context.Context, obj *biz.ChannelModelCandidateChannel) (*objects.GUID, error) {
+	return &objects.GUID{Type: ent.TypeChannel, ID: obj.ID}, nil
+}
+
+// ChannelID is the resolver for the channelID field.
+func (r *channelModelDiscoveryFailureResolver) ChannelID(ctx context.Context, obj *biz.ChannelModelDiscoveryFailure) (*objects.GUID, error) {
+	return &objects.GUID{Type: ent.TypeChannel, ID: obj.ChannelID}, nil
+}
+
 // AssociatedChannelCount is the resolver for the associatedChannelCount field.
 func (r *modelResolver) AssociatedChannelCount(ctx context.Context, obj *ent.Model) (int, error) {
 	return r.modelService.CountModelAssociatedChannels(ctx, obj)
@@ -91,6 +101,15 @@ func (r *mutationResolver) BulkEnableModels(ctx context.Context, ids []*objects.
 	return true, nil
 }
 
+// BulkAddChannelModels is the resolver for the bulkAddChannelModels field.
+func (r *mutationResolver) BulkAddChannelModels(ctx context.Context, selections []*biz.ChannelModelAddSelectionInput) (*biz.BulkAddChannelModelsPayload, error) {
+	if err := authz.RequireScope(ctx, scopes.ScopeWriteChannels); err != nil {
+		return nil, err
+	}
+
+	return r.channelService.BulkAddChannelModels(ctx, selections)
+}
+
 // BulkDeleteModels is the resolver for the bulkDeleteModels field.
 func (r *mutationResolver) BulkDeleteModels(ctx context.Context, ids []*objects.GUID) (bool, error) {
 	modelIDs := objects.IntGuids(ids)
@@ -124,6 +143,15 @@ func (r *queryResolver) FetchModels(ctx context.Context, input biz.FetchModelsIn
 		Models: models,
 		Error:  result.Error,
 	}, nil
+}
+
+// DiscoverChannelModelCandidates is the resolver for the discoverChannelModelCandidates field.
+func (r *queryResolver) DiscoverChannelModelCandidates(ctx context.Context, modelName string) (*biz.ChannelModelDiscoveryResult, error) {
+	if err := authz.RequireScope(ctx, scopes.ScopeWriteChannels); err != nil {
+		return nil, err
+	}
+
+	return r.modelFetcher.DiscoverChannelModelCandidates(ctx, modelName)
 }
 
 // QueryModels is the resolver for the queryModels field.
@@ -194,3 +222,16 @@ func (r *queryResolver) QueryModelChannelConnections(ctx context.Context, associ
 func (r *queryResolver) QueryUnassociatedChannels(ctx context.Context) ([]*biz.UnassociatedChannel, error) {
 	return r.modelService.QueryUnassociatedChannels(ctx)
 }
+
+// ChannelModelCandidateChannel returns ChannelModelCandidateChannelResolver implementation.
+func (r *Resolver) ChannelModelCandidateChannel() ChannelModelCandidateChannelResolver {
+	return &channelModelCandidateChannelResolver{r}
+}
+
+// ChannelModelDiscoveryFailure returns ChannelModelDiscoveryFailureResolver implementation.
+func (r *Resolver) ChannelModelDiscoveryFailure() ChannelModelDiscoveryFailureResolver {
+	return &channelModelDiscoveryFailureResolver{r}
+}
+
+type channelModelCandidateChannelResolver struct{ *Resolver }
+type channelModelDiscoveryFailureResolver struct{ *Resolver }

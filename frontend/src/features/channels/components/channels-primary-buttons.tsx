@@ -1,6 +1,7 @@
-import { IconPlus, IconUpload, IconArrowsSort, IconSettings, IconScale, IconTemplate } from '@tabler/icons-react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
+import { IconPlus, IconUpload, IconArrowsSort, IconSettings, IconScale, IconTemplate } from '@tabler/icons-react';
+import { ListPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { PermissionGuard } from '@/components/permission-guard';
 import { revealFocusedHorizontalButton, useHorizontalScroll } from '@/hooks/use-horizontal-scroll';
@@ -16,11 +17,7 @@ export function ChannelsPrimaryButtons() {
     <div ref={scrollRef} onFocusCapture={revealFocusedHorizontalButton} data-testid='channel-actions-scroller' className='flex min-w-0 max-w-full gap-2 overflow-x-auto p-1'>
       <PermissionGuard requiredSystemScope='read_settings'>
         {/* Load Balancing Strategy - navigate to system retry configuration */}
-        <Button
-          variant='outline'
-          className='shrink-0 space-x-1'
-          onClick={() => navigate({ to: '/system', search: { tab: 'retry' } })}
-        >
+        <Button variant='outline' className='shrink-0 space-x-1' onClick={() => navigate({ to: '/system', search: { tab: 'retry' } })}>
           <span>{t('channels.loadBalancingStrategy')}</span> <IconScale size={18} />
         </Button>
       </PermissionGuard>
@@ -52,6 +49,15 @@ export function ChannelsPrimaryButtons() {
           {/* Bulk Ordering - requires write_channels permission */}
           <Button variant='outline' className='shrink-0 space-x-1' onClick={() => setOpen('bulkOrdering')}>
             <span>{t('channels.orderChannels')}</span> <IconArrowsSort size={18} />
+          </Button>
+
+          <Button
+            variant='outline'
+            className='shrink-0 space-x-1'
+            onClick={() => setOpen('bulkAddModels')}
+            data-testid='bulk-add-channel-models-button'
+          >
+            <span>{t('channels.bulkAddModels.action')}</span> <ListPlus size={18} />
           </Button>
 
           {/* Add Channel - requires write_channels permission */}
