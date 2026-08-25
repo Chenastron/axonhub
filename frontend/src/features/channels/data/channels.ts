@@ -47,6 +47,8 @@ import {
   channelModelDiscoveryResultSchema,
   BulkAddChannelModelsPayload,
   bulkAddChannelModelsPayloadSchema,
+  CleanInvalidChannelModelsStatus,
+  cleanInvalidChannelModelsStatusSchema,
 } from './schema';
 
 const QUERY_CHANNEL_NAMES_QUERY = `
@@ -1004,6 +1006,44 @@ const BULK_ADD_CHANNEL_MODELS_MUTATION = `
       selectedModels
       updatedChannels
       addedAssociations
+    }
+  }
+`;
+
+const CLEAN_INVALID_CHANNEL_MODELS_MUTATION = `
+  mutation CleanInvalidChannelModels {
+    cleanInvalidChannelModels {
+      running
+      scanned
+      cleaned
+      removedAssociations
+      failures {
+        channelID
+        channelName
+        error
+      }
+      finished
+      error
+      total
+    }
+  }
+`;
+
+const CLEAN_INVALID_CHANNEL_MODELS_STATUS_QUERY = `
+  query CleanInvalidChannelModelsStatus {
+    cleanInvalidChannelModelsStatus {
+      running
+      scanned
+      cleaned
+      removedAssociations
+      failures {
+        channelID
+        channelName
+        error
+      }
+      finished
+      error
+      total
     }
   }
 `;
@@ -2333,6 +2373,55 @@ export function useBulkAddChannelModels() {
         })
       );
     },
+  });
+}
+
+export function useCleanInvalidChannelModels() {
+  const queryClient = useQueryClient();
+  const { handleError } = useErrorHandler();
+
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        const data = await graphqlRequest<{ cleanInvalidChannelModels: CleanInvalidChannelModelsStatus }>(
+          CLEAN_INVALID_CHANNEL_MODELS_MUTATION
+        );
+        return cleanInvalidChannelModelsStatusSchema.parse(data.cleanInvalidChannelModels);
+      } catch (error) {
+        handleError(error, { context: 'Clean Invalid Channel Models' });
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
+    },
+  });
+}
+
+export function useCleanInvalidChannelModelsStatus(isOpen: boolean) {
+  const { handleError } = useErrorHandler();
+
+  return useQuery({
+    queryKey: ['cleanInvalidChannelModelsStatus', isOpen],
+    queryFn: async () => {
+      try {
+        const data = await graphqlRequest<{ cleanInvalidChannelModelsStatus: CleanInvalidChannelModelsStatus }>(
+          CLEAN_INVALID_CHANNEL_MODELS_STATUS_QUERY
+        );
+        return cleanInvalidChannelModelsStatusSchema.parse(data.cleanInvalidChannelModelsStatus);
+      } catch (error) {
+        handleError(error, { context: 'Clean Invalid Channel Models Status' });
+        throw error;
+      }
+    },
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data && data.running) {
+        return 2000;
+      }
+      return false;
+    },
+    enabled: isOpen,
   });
 }
 

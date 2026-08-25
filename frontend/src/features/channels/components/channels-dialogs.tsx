@@ -6,6 +6,7 @@ import { ChannelsAPIKeyManagementDialog } from './channels-api-key-management-di
 import { ChannelsArchiveDialog } from './channels-archive-dialog';
 import { ChannelsAvailabilityDialog } from './channels-availability-dialog';
 import { ChannelsBulkAddModelsDialog } from './channels-bulk-add-models-dialog';
+import { ChannelsCleanInvalidModelsDialog } from './channels-clean-invalid-models-dialog';
 import { ChannelsBulkApplyTemplateDialog } from './channels-bulk-apply-template-dialog';
 import { ChannelsBulkArchiveDialog } from './channels-bulk-archive-dialog';
 import { ChannelsBulkAutoDisableDialog } from './channels-bulk-auto-disable-dialog';
@@ -92,6 +93,8 @@ export function ChannelsDialogs() {
       <ChannelsBulkOrderingDialog open={open === 'bulkOrdering'} onOpenChange={(isOpen) => setOpen(isOpen ? 'bulkOrdering' : null)} />
 
       <ChannelsBulkAddModelsDialog />
+
+      <ChannelsCleanInvalidModelsDialog />
 
       {currentRow && (
         <>

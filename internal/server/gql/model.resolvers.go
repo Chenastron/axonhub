@@ -29,6 +29,11 @@ func (r *channelModelDiscoveryFailureResolver) ChannelID(ctx context.Context, ob
 	return &objects.GUID{Type: ent.TypeChannel, ID: obj.ChannelID}, nil
 }
 
+// Total is the resolver for the total field.
+func (r *cleanInvalidChannelModelsStatusResolver) Total(ctx context.Context, obj *biz.CleanInvalidChannelModelsStatus) (int, error) {
+	return obj.Total, nil
+}
+
 // AssociatedChannelCount is the resolver for the associatedChannelCount field.
 func (r *modelResolver) AssociatedChannelCount(ctx context.Context, obj *ent.Model) (int, error) {
 	return r.modelService.CountModelAssociatedChannels(ctx, obj)
@@ -110,6 +115,15 @@ func (r *mutationResolver) BulkAddChannelModels(ctx context.Context, selections 
 	return r.channelService.BulkAddChannelModels(ctx, selections)
 }
 
+// CleanInvalidChannelModels is the resolver for the cleanInvalidChannelModels field.
+func (r *mutationResolver) CleanInvalidChannelModels(ctx context.Context) (*biz.CleanInvalidChannelModelsStatus, error) {
+	if err := authz.RequireScope(ctx, scopes.ScopeWriteChannels); err != nil {
+		return nil, err
+	}
+
+	return r.modelFetcher.CleanInvalidChannelModels(ctx)
+}
+
 // BulkDeleteModels is the resolver for the bulkDeleteModels field.
 func (r *mutationResolver) BulkDeleteModels(ctx context.Context, ids []*objects.GUID) (bool, error) {
 	modelIDs := objects.IntGuids(ids)
@@ -152,6 +166,15 @@ func (r *queryResolver) DiscoverChannelModelCandidates(ctx context.Context, mode
 	}
 
 	return r.modelFetcher.DiscoverChannelModelCandidates(ctx, modelName)
+}
+
+// CleanInvalidChannelModelsStatus is the resolver for the cleanInvalidChannelModelsStatus field.
+func (r *queryResolver) CleanInvalidChannelModelsStatus(ctx context.Context) (*biz.CleanInvalidChannelModelsStatus, error) {
+	if err := authz.RequireScope(ctx, scopes.ScopeReadChannels); err != nil {
+		return nil, err
+	}
+
+	return r.modelFetcher.GetCleanInvalidChannelModelsStatus(ctx), nil
 }
 
 // QueryModels is the resolver for the queryModels field.
@@ -233,5 +256,11 @@ func (r *Resolver) ChannelModelDiscoveryFailure() ChannelModelDiscoveryFailureRe
 	return &channelModelDiscoveryFailureResolver{r}
 }
 
+// CleanInvalidChannelModelsStatus returns CleanInvalidChannelModelsStatusResolver implementation.
+func (r *Resolver) CleanInvalidChannelModelsStatus() CleanInvalidChannelModelsStatusResolver {
+	return &cleanInvalidChannelModelsStatusResolver{r}
+}
+
 type channelModelCandidateChannelResolver struct{ *Resolver }
 type channelModelDiscoveryFailureResolver struct{ *Resolver }
+type cleanInvalidChannelModelsStatusResolver struct{ *Resolver }

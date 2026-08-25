@@ -36,6 +36,9 @@ type ModelFetcher struct {
 	clineRecommendedModelsURL string
 	copilotFetcher            *providerConfFetcher
 	geminiVertexFetcher       *providerConfFetcher
+	cleanMu                   sync.Mutex
+	cleanupStatus             *CleanInvalidChannelModelsStatus
+	cleanupStatusMu           sync.RWMutex
 }
 
 // providerConfFetcher handles fetching models from PublicProviderConf with caching.
@@ -154,6 +157,7 @@ func NewModelFetcher(httpClient *httpclient.HttpClient, channelService *ChannelS
 			cacheDuration: providerConfCacheDuration,
 			providerURL:   vertex.ProviderConfURL,
 		},
+		cleanupStatus: &CleanInvalidChannelModelsStatus{Finished: true},
 	}
 }
 

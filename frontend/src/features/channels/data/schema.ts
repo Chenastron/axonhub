@@ -496,6 +496,19 @@ export const bulkAddChannelModelsPayloadSchema = z.object({
 });
 
 export type BulkAddChannelModelsPayload = z.infer<typeof bulkAddChannelModelsPayloadSchema>;
+
+export const cleanInvalidChannelModelsStatusSchema = z.object({
+  running: z.boolean(),
+  scanned: z.number(),
+  cleaned: z.number(),
+  removedAssociations: z.number(),
+  failures: z.array(channelModelDiscoveryFailureSchema),
+  finished: z.boolean(),
+  error: z.string().optional().default(''),
+  total: z.number(),
+});
+
+export type CleanInvalidChannelModelsStatus = z.infer<typeof cleanInvalidChannelModelsStatusSchema>;
 export interface ChannelModelAddSelectionInput {
   modelID: string;
   channelIDs: string[];
