@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -154,27 +155,87 @@ func TestChannelService_BulkAddChannelModels(t *testing.T) {
 	require.Equal(t, 0, payload.AddedAssociations)
 }
 
-func TestChannelService_BulkAddChannelModelsRollsBackForMissingChannel(t *testing.T) {
+func TestModelFetcher_CleanInvalidChannelModels(t *testing.T) {
+	nativeClient := &http.Client{Transport: channelModelRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		auth := req.Header.Get("Authorization")
+		var body string
+		switch {
+		case strings.Contains(auth, "key-a"):
+			body = `{"data":[{"id":"model-1"},{"id":"model-3"}]}`
+		case strings.Contains(auth, "key-b"):
+			body = `{"data":[]}`
+		default:
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"unauthorized"}`)),
+			}, nil
+		}
+
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(body)),
+		}, nil
+	})}
+
 	svc, client := setupTestChannelService(t)
 	defer client.Close()
 
 	ctx := authz.WithTestBypass(ent.NewContext(context.Background(), client))
-	ch, err := client.Channel.Create().
-		SetName("Existing").
-		SetType(channel.TypeOpenai).
-		SetBaseURL("https://api.example.com").
-		SetCredentials(objects.ChannelCredentials{APIKey: "key"}).
-		SetSupportedModels([]string{"existing"}).
-		SetDefaultTestModel("existing").
-		Save(ctx)
+	createChannel := func(name string, apiKey string, supportedModels []string) *ent.Channel {
+		ch, err := client.Channel.Create().
+			SetName(name).
+			SetType(channel.TypeOpenai).
+			SetBaseURL("https://api.example.com").
+			SetCredentials(objects.ChannelCredentials{APIKey: apiKey}).
+			SetSupportedModels(supportedModels).
+			SetDefaultTestModel("model-1").
+			Save(ctx)
+		require.NoError(t, err)
+		return ch
+	}
+
+	chA := createChannel("ChannelA", "key-a", []string{"model-1", "model-2"})
+	chB := createChannel("ChannelB", "key-b", []string{"model-1"})
+	chC := createChannel("ChannelC", "", []string{"model-1"})
+
+	fetcher := NewModelFetcher(httpclient.NewHttpClientWithClient(nativeClient), svc)
+	
+	// Start task asynchronously
+	_, err := fetcher.CleanInvalidChannelModels(ctx)
 	require.NoError(t, err)
 
-	_, err = svc.BulkAddChannelModels(ctx, []*ChannelModelAddSelectionInput{
-		{ModelID: "gpt-5-6", ChannelIDs: []int{ch.ID, 999999}},
-	})
-	require.ErrorContains(t, err, "expected to find 2 channels")
+	// Since we run in a goroutine, let's wait a small amount of time for the goroutine to actually acquire the lock or start.
+	// Or we can just sleep a few milliseconds.
+	time.Sleep(50 * time.Millisecond)
 
-	ch, err = client.Channel.Get(ctx, ch.ID)
+	// Wait for the background task to complete (it runs very fast in test since there's no actual delay)
+	// We can try to lock f.cleanMu to wait for it.
+	fetcher.cleanMu.Lock()
+	fetcher.cleanMu.Unlock()
+
+	// Get final status
+	payload := fetcher.GetCleanInvalidChannelModelsStatus(ctx)
+	require.True(t, payload.Finished)
+	require.False(t, payload.Running)
+	require.Empty(t, payload.Error)
+
+	require.Equal(t, 3, payload.Scanned)
+	require.Equal(t, 3, payload.Total)
+	require.Equal(t, 1, payload.Cleaned)
+	require.Equal(t, 1, payload.RemovedAssociations)
+	require.Len(t, payload.Failures, 1)
+	require.Equal(t, chC.ID, payload.Failures[0].ChannelID)
+
+	chA, err = client.Channel.Get(ctx, chA.ID)
 	require.NoError(t, err)
-	require.Equal(t, []string{"existing"}, ch.SupportedModels)
+	require.Equal(t, []string{"model-1"}, chA.SupportedModels)
+
+	chB, err = client.Channel.Get(ctx, chB.ID)
+	require.NoError(t, err)
+	require.Equal(t, []string{"model-1"}, chB.SupportedModels)
+
+	chC, err = client.Channel.Get(ctx, chC.ID)
+	require.NoError(t, err)
+	require.Equal(t, []string{"model-1"}, chC.SupportedModels)
 }

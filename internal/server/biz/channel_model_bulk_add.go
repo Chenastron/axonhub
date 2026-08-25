@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/looplj/axonhub/internal/authz"
 	"github.com/looplj/axonhub/internal/ent"
 	"github.com/looplj/axonhub/internal/ent/channel"
 )
@@ -229,6 +231,219 @@ func containsTokenSequence(tokens, sequence []string) bool {
 		}
 	}
 	return false
+}
+
+type CleanInvalidChannelModelsStatus struct {
+	Running             bool                            `json:"running"`
+	Scanned             int                             `json:"scanned"`
+	Cleaned             int                             `json:"cleaned"`
+	RemovedAssociations int                             `json:"removedAssociations"`
+	Failures            []*ChannelModelDiscoveryFailure `json:"failures"`
+	Finished            bool                            `json:"finished"`
+	Error               string                          `json:"error"`
+	Total               int                             `json:"total"`
+}
+
+// CleanInvalidChannelModels starts a background task to fetch upstream models for all channels,
+// and remove any configured models from the channel's SupportedModels that are no longer
+// returned by the upstream API. It returns immediately with the current running status.
+func (f *ModelFetcher) CleanInvalidChannelModels(ctx context.Context) (*CleanInvalidChannelModelsStatus, error) {
+	f.cleanupStatusMu.Lock()
+	if f.cleanupStatus != nil && f.cleanupStatus.Running {
+		status := *f.cleanupStatus
+		f.cleanupStatusMu.Unlock()
+		return &status, nil
+	}
+
+	f.cleanupStatus = &CleanInvalidChannelModelsStatus{
+		Running: true,
+	}
+	f.cleanupStatusMu.Unlock()
+
+	// Create a completely clean background context with SystemBypass.
+	// This detaches from the GraphQL transaction context to prevent "transaction already committed" errors.
+	bgCtx := authz.WithSystemBypass(context.Background(), "async-clean-invalid-models")
+
+	go f.runCleanInvalidChannelModelsBackground(bgCtx)
+
+	f.cleanupStatusMu.RLock()
+	defer f.cleanupStatusMu.RUnlock()
+	return f.cleanupStatus, nil
+}
+
+func (f *ModelFetcher) GetCleanInvalidChannelModelsStatus(ctx context.Context) *CleanInvalidChannelModelsStatus {
+	f.cleanupStatusMu.RLock()
+	defer f.cleanupStatusMu.RUnlock()
+	if f.cleanupStatus == nil {
+		return &CleanInvalidChannelModelsStatus{Finished: true}
+	}
+	return f.cleanupStatus
+}
+
+func (f *ModelFetcher) runCleanInvalidChannelModelsBackground(ctx context.Context) {
+	if !f.cleanMu.TryLock() {
+		f.cleanupStatusMu.Lock()
+		f.cleanupStatus.Running = false
+		f.cleanupStatus.Finished = true
+		f.cleanupStatus.Error = "another cleanup task is already running"
+		f.cleanupStatusMu.Unlock()
+		return
+	}
+	defer f.cleanMu.Unlock()
+
+	channels, err := f.channelService.entFromContext(ctx).Channel.Query().All(ctx)
+	if err != nil {
+		f.cleanupStatusMu.Lock()
+		f.cleanupStatus.Running = false
+		f.cleanupStatus.Finished = true
+		f.cleanupStatus.Error = fmt.Sprintf("failed to query channels: %v", err)
+		f.cleanupStatusMu.Unlock()
+		return
+	}
+
+	// Initialize total count in cleanupStatus
+	f.cleanupStatusMu.Lock()
+	f.cleanupStatus.Total = len(channels)
+	f.cleanupStatus.Scanned = 0
+	f.cleanupStatusMu.Unlock()
+
+	fetchResults := make(chan channelModelDiscoveryFetchResult, len(channels))
+	var group errgroup.Group
+	group.SetLimit(maxConcurrentChannelModelDiscovery)
+
+	for _, ch := range channels {
+		ch := ch
+		group.Go(func() error {
+			// Single Channel Hard Timeout protection of 5 seconds to prevent slow channels from freezing the queue
+			channelCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
+			result, fetchErr := f.FetchModels(channelCtx, FetchModelsInput{
+				ChannelType: ch.Type.String(),
+				BaseURL:     ch.BaseURL,
+				ChannelID:   &ch.ID,
+			})
+
+			// Securely increment Scanned count immediately as each channel finishes fetching
+			f.cleanupStatusMu.Lock()
+			f.cleanupStatus.Scanned++
+			f.cleanupStatusMu.Unlock()
+
+			if fetchErr != nil {
+				fetchResults <- channelModelDiscoveryFetchResult{channel: ch, err: fetchErr.Error()}
+				return nil
+			}
+			if result.Error != nil {
+				fetchResults <- channelModelDiscoveryFetchResult{channel: ch, err: *result.Error}
+				return nil
+			}
+
+			fetchResults <- channelModelDiscoveryFetchResult{channel: ch, models: result.Models}
+			return nil
+		})
+	}
+
+	_ = group.Wait()
+	close(fetchResults)
+
+	channelUpdates := make(map[int][]string)
+	var failures []*ChannelModelDiscoveryFailure
+
+	for fetched := range fetchResults {
+		if fetched.err != "" {
+			failures = append(failures, &ChannelModelDiscoveryFailure{
+				ChannelID:   fetched.channel.ID,
+				ChannelName: fetched.channel.Name,
+				Error:       fetched.err,
+			})
+			continue
+		}
+
+		// Only clean if we fetched a non-empty list of upstream models.
+		// If upstream returns empty, we skip to prevent accidental complete wipe of configured models.
+		if len(fetched.models) == 0 {
+			continue
+		}
+
+		upstreamModels := make(map[string]bool, len(fetched.models))
+		for _, model := range fetched.models {
+			upstreamModels[model.ID] = true
+		}
+
+		var nextModels []string
+		var removedCount int
+		for _, m := range fetched.channel.SupportedModels {
+			if upstreamModels[m] {
+				nextModels = append(nextModels, m)
+			} else {
+				removedCount++
+			}
+		}
+
+		if removedCount > 0 {
+			channelUpdates[fetched.channel.ID] = nextModels
+		}
+	}
+
+	var cleanedCount int
+	var removedAssociationsCount int
+
+	if len(channelUpdates) > 0 {
+		channelIDs := make([]int, 0, len(channelUpdates))
+		for channelID := range channelUpdates {
+			channelIDs = append(channelIDs, channelID)
+		}
+		sort.Ints(channelIDs)
+
+		err = f.channelService.RunInTransaction(ctx, func(ctx context.Context) error {
+			for _, channelID := range channelIDs {
+				nextModels := channelUpdates[channelID]
+				
+				// Calculate dynamic removed count
+				ch, getErr := f.channelService.entFromContext(ctx).Channel.Get(ctx, channelID)
+				if getErr == nil {
+					removedAssociationsCount += len(ch.SupportedModels) - len(nextModels)
+				}
+
+				if _, err := f.channelService.entFromContext(ctx).Channel.UpdateOneID(channelID).
+					SetSupportedModels(nextModels).
+					Save(ctx); err != nil {
+					return fmt.Errorf("failed to update channel %d: %w", channelID, err)
+				}
+				cleanedCount++
+			}
+			return nil
+		})
+		if err != nil {
+			f.cleanupStatusMu.Lock()
+			f.cleanupStatus.Running = false
+			f.cleanupStatus.Finished = true
+			f.cleanupStatus.Error = fmt.Sprintf("transaction failed: %v", err)
+			f.cleanupStatusMu.Unlock()
+			return
+		}
+	}
+
+	if cleanedCount > 0 {
+		f.channelService.asyncReloadChannels()
+	}
+
+	sort.Slice(failures, func(i, j int) bool {
+		left := strings.ToLower(failures[i].ChannelName)
+		right := strings.ToLower(failures[j].ChannelName)
+		if left == right {
+			return failures[i].ChannelID < failures[j].ChannelID
+		}
+		return left < right
+	})
+
+	f.cleanupStatusMu.Lock()
+	f.cleanupStatus.Running = false
+	f.cleanupStatus.Finished = true
+	f.cleanupStatus.Cleaned = cleanedCount
+	f.cleanupStatus.RemovedAssociations = removedAssociationsCount
+	f.cleanupStatus.Failures = failures
+	f.cleanupStatusMu.Unlock()
 }
 
 type ChannelModelAddSelectionInput struct {

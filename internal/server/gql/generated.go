@@ -675,6 +675,17 @@ type ComplexityRoot struct {
 		UsingServerDefaults func(childComplexity int) int
 	}
 
+	CleanInvalidChannelModelsStatus struct {
+		Cleaned             func(childComplexity int) int
+		Error               func(childComplexity int) int
+		Failures            func(childComplexity int) int
+		Finished            func(childComplexity int) int
+		RemovedAssociations func(childComplexity int) int
+		Running             func(childComplexity int) int
+		Scanned             func(childComplexity int) int
+		Total               func(childComplexity int) int
+	}
+
 	CleanupOption struct {
 		CleanupDays  func(childComplexity int) int
 		Enabled      func(childComplexity int) int
@@ -1058,8 +1069,8 @@ type ComplexityRoot struct {
 		ArchiveThread                         func(childComplexity int, id objects.GUID) int
 		ArchiveTrace                          func(childComplexity int, id objects.GUID) int
 		Backup                                func(childComplexity int, input backup.BackupOptions) int
-		BulkAddChannelTags                    func(childComplexity int, ids []*objects.GUID, tags []string) int
 		BulkAddChannelModels                  func(childComplexity int, selections []*biz.ChannelModelAddSelectionInput) int
+		BulkAddChannelTags                    func(childComplexity int, ids []*objects.GUID, tags []string) int
 		BulkArchiveAPIKeys                    func(childComplexity int, ids []*objects.GUID) int
 		BulkArchiveChannels                   func(childComplexity int, ids []*objects.GUID) int
 		BulkArchiveModels                     func(childComplexity int, ids []*objects.GUID) int
@@ -1087,6 +1098,7 @@ type ComplexityRoot struct {
 		BulkUpdateChannelAutoDisable          func(childComplexity int, input biz.BulkUpdateChannelAutoDisableInput) int
 		BulkUpdateChannelOrdering             func(childComplexity int, input BulkUpdateChannelOrderingInput) int
 		CheckProviderQuotas                   func(childComplexity int) int
+		CleanInvalidChannelModels             func(childComplexity int) int
 		ClearCache                            func(childComplexity int, input ClearCacheInput) int
 		ClearChannelOverrideTemplates         func(childComplexity int, input ClearChannelOverrideTemplatesInput) int
 		CompleteAutoDisableChannelOnboarding  func(childComplexity int, input CompleteAutoDisableChannelOnboardingInput) int
@@ -1496,6 +1508,7 @@ type ComplexityRoot struct {
 		Channels                        func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, orderBy *ent.ChannelOrder, where *ent.ChannelWhereInput) int
 		CheckForUpdate                  func(childComplexity int, includeBeta bool) int
 		ClaudeCodeSafeguardsSettings    func(childComplexity int) int
+		CleanInvalidChannelModelsStatus func(childComplexity int) int
 		CodexCatalogChannels            func(childComplexity int) int
 		CodexCompatibilityEnabled       func(childComplexity int) int
 		CodexCompatibilitySettings      func(childComplexity int) int
@@ -2463,6 +2476,7 @@ type MutationResolver interface {
 	BulkDisableModels(ctx context.Context, ids []*objects.GUID) (bool, error)
 	BulkEnableModels(ctx context.Context, ids []*objects.GUID) (bool, error)
 	BulkAddChannelModels(ctx context.Context, selections []*biz.ChannelModelAddSelectionInput) (*biz.BulkAddChannelModelsPayload, error)
+	CleanInvalidChannelModels(ctx context.Context) (*biz.CleanInvalidChannelModelsStatus, error)
 	BulkDeleteModels(ctx context.Context, ids []*objects.GUID) (bool, error)
 	Backup(ctx context.Context, input backup.BackupOptions) (*BackupPayload, error)
 	Restore(ctx context.Context, file graphql.Upload, input backup.RestoreOptions) (*RestorePayload, error)
@@ -2590,6 +2604,7 @@ type QueryResolver interface {
 	ClaudeCodeSafeguardsSettings(ctx context.Context) (*biz.ClaudeCodeSafeguardsSettings, error)
 	FetchModels(ctx context.Context, input biz.FetchModelsInput) (*FetchModelsPayload, error)
 	DiscoverChannelModelCandidates(ctx context.Context, modelName string) (*biz.ChannelModelDiscoveryResult, error)
+	CleanInvalidChannelModelsStatus(ctx context.Context) (*biz.CleanInvalidChannelModelsStatus, error)
 	QueryModels(ctx context.Context, input QueryModelsInput) ([]*biz.ModelIdentityWithStatus, error)
 	QueryModelChannelConnections(ctx context.Context, associations []*objects.ModelAssociation) ([]*biz.ModelChannelConnection, error)
 	QueryUnassociatedChannels(ctx context.Context) ([]*biz.UnassociatedChannel, error)
@@ -4917,6 +4932,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ClaudeCodeSafeguardsSettings.UsingServerDefaults(childComplexity), true
 
+	case "CleanInvalidChannelModelsStatus.cleaned":
+		if e.complexity.CleanInvalidChannelModelsStatus.Cleaned == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Cleaned(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.error":
+		if e.complexity.CleanInvalidChannelModelsStatus.Error == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Error(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.failures":
+		if e.complexity.CleanInvalidChannelModelsStatus.Failures == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Failures(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.finished":
+		if e.complexity.CleanInvalidChannelModelsStatus.Finished == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Finished(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.removedAssociations":
+		if e.complexity.CleanInvalidChannelModelsStatus.RemovedAssociations == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.RemovedAssociations(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.running":
+		if e.complexity.CleanInvalidChannelModelsStatus.Running == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Running(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.scanned":
+		if e.complexity.CleanInvalidChannelModelsStatus.Scanned == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Scanned(childComplexity), true
+	case "CleanInvalidChannelModelsStatus.total":
+		if e.complexity.CleanInvalidChannelModelsStatus.Total == nil {
+			break
+		}
+
+		return e.complexity.CleanInvalidChannelModelsStatus.Total(childComplexity), true
+
 	case "CleanupOption.cleanupDays":
 		if e.complexity.CleanupOption.CleanupDays == nil {
 			break
@@ -6275,17 +6339,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Backup(childComplexity, args["input"].(backup.BackupOptions)), true
-	case "Mutation.bulkAddChannelTags":
-		if e.complexity.Mutation.BulkAddChannelTags == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_bulkAddChannelTags_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.BulkAddChannelTags(childComplexity, args["ids"].([]*objects.GUID), args["tags"].([]string)), true
 	case "Mutation.bulkAddChannelModels":
 		if e.complexity.Mutation.BulkAddChannelModels == nil {
 			break
@@ -6297,6 +6350,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.BulkAddChannelModels(childComplexity, args["selections"].([]*biz.ChannelModelAddSelectionInput)), true
+	case "Mutation.bulkAddChannelTags":
+		if e.complexity.Mutation.BulkAddChannelTags == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_bulkAddChannelTags_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.BulkAddChannelTags(childComplexity, args["ids"].([]*objects.GUID), args["tags"].([]string)), true
 	case "Mutation.bulkArchiveAPIKeys":
 		if e.complexity.Mutation.BulkArchiveAPIKeys == nil {
 			break
@@ -6589,6 +6653,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CheckProviderQuotas(childComplexity), true
+	case "Mutation.cleanInvalidChannelModels":
+		if e.complexity.Mutation.CleanInvalidChannelModels == nil {
+			break
+		}
+
+		return e.complexity.Mutation.CleanInvalidChannelModels(childComplexity), true
 	case "Mutation.clearCache":
 		if e.complexity.Mutation.ClearCache == nil {
 			break
@@ -8951,6 +9021,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.ClaudeCodeSafeguardsSettings(childComplexity), true
+	case "Query.cleanInvalidChannelModelsStatus":
+		if e.complexity.Query.CleanInvalidChannelModelsStatus == nil {
+			break
+		}
+
+		return e.complexity.Query.CleanInvalidChannelModelsStatus(childComplexity), true
 	case "Query.codexCatalogChannels":
 		if e.complexity.Query.CodexCatalogChannels == nil {
 			break
@@ -12963,6 +13039,17 @@ func (ec *executionContext) field_Mutation_backup_args(ctx context.Context, rawA
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_bulkAddChannelModels_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "selections", ec.unmarshalNChannelModelAddSelectionInput2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInputᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["selections"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_bulkAddChannelTags_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -12976,17 +13063,6 @@ func (ec *executionContext) field_Mutation_bulkAddChannelTags_args(ctx context.C
 		return nil, err
 	}
 	args["tags"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_bulkAddChannelModels_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "selections", ec.unmarshalNChannelModelAddSelectionInput2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInputᚄ)
-	if err != nil {
-		return nil, err
-	}
-	args["selections"] = arg0
 	return args, nil
 }
 
@@ -28002,6 +28078,246 @@ func (ec *executionContext) fieldContext_ClaudeCodeSafeguardsSettings_defaultPol
 	return fc, nil
 }
 
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_running(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_running,
+		func(ctx context.Context) (any, error) {
+			return obj.Running, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_running(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_scanned(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_scanned,
+		func(ctx context.Context) (any, error) {
+			return obj.Scanned, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_scanned(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_cleaned(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_cleaned,
+		func(ctx context.Context) (any, error) {
+			return obj.Cleaned, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_cleaned(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_removedAssociations(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_removedAssociations,
+		func(ctx context.Context) (any, error) {
+			return obj.RemovedAssociations, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_removedAssociations(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_failures(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_failures,
+		func(ctx context.Context) (any, error) {
+			return obj.Failures, nil
+		},
+		nil,
+		ec.marshalNChannelModelDiscoveryFailure2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelDiscoveryFailureᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_failures(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "channelID":
+				return ec.fieldContext_ChannelModelDiscoveryFailure_channelID(ctx, field)
+			case "channelName":
+				return ec.fieldContext_ChannelModelDiscoveryFailure_channelName(ctx, field)
+			case "error":
+				return ec.fieldContext_ChannelModelDiscoveryFailure_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChannelModelDiscoveryFailure", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_finished(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_finished,
+		func(ctx context.Context) (any, error) {
+			return obj.Finished, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_finished(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_error(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_error,
+		func(ctx context.Context) (any, error) {
+			return obj.Error, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus_total(ctx context.Context, field graphql.CollectedField, obj *biz.CleanInvalidChannelModelsStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CleanInvalidChannelModelsStatus_total,
+		func(ctx context.Context) (any, error) {
+			return obj.Total, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CleanInvalidChannelModelsStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CleanupOption_resourceType(ctx context.Context, field graphql.CollectedField, obj *biz.CleanupOption) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -40614,6 +40930,53 @@ func (ec *executionContext) fieldContext_Mutation_bulkAddChannelModels(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_cleanInvalidChannelModels(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_cleanInvalidChannelModels,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().CleanInvalidChannelModels(ctx)
+		},
+		nil,
+		ec.marshalNCleanInvalidChannelModelsStatus2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCleanInvalidChannelModelsStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_cleanInvalidChannelModels(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "running":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_running(ctx, field)
+			case "scanned":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_scanned(ctx, field)
+			case "cleaned":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_cleaned(ctx, field)
+			case "removedAssociations":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_removedAssociations(ctx, field)
+			case "failures":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_failures(ctx, field)
+			case "finished":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_finished(ctx, field)
+			case "error":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_error(ctx, field)
+			case "total":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_total(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CleanInvalidChannelModelsStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_bulkDeleteModels(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -50563,6 +50926,53 @@ func (ec *executionContext) fieldContext_Query_discoverChannelModelCandidates(ct
 	if fc.Args, err = ec.field_Query_discoverChannelModelCandidates_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_cleanInvalidChannelModelsStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_cleanInvalidChannelModelsStatus,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().CleanInvalidChannelModelsStatus(ctx)
+		},
+		nil,
+		ec.marshalNCleanInvalidChannelModelsStatus2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCleanInvalidChannelModelsStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_cleanInvalidChannelModelsStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "running":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_running(ctx, field)
+			case "scanned":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_scanned(ctx, field)
+			case "cleaned":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_cleaned(ctx, field)
+			case "removedAssociations":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_removedAssociations(ctx, field)
+			case "failures":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_failures(ctx, field)
+			case "finished":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_finished(ctx, field)
+			case "error":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_error(ctx, field)
+			case "total":
+				return ec.fieldContext_CleanInvalidChannelModelsStatus_total(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CleanInvalidChannelModelsStatus", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -100258,6 +100668,80 @@ func (ec *executionContext) _ClaudeCodeSafeguardsSettings(ctx context.Context, s
 	return out
 }
 
+var cleanInvalidChannelModelsStatusImplementors = []string{"CleanInvalidChannelModelsStatus"}
+
+func (ec *executionContext) _CleanInvalidChannelModelsStatus(ctx context.Context, sel ast.SelectionSet, obj *biz.CleanInvalidChannelModelsStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, cleanInvalidChannelModelsStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CleanInvalidChannelModelsStatus")
+		case "running":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_running(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "scanned":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_scanned(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cleaned":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_cleaned(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "removedAssociations":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_removedAssociations(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failures":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_failures(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "finished":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_finished(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "error":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_error(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total":
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_total(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var cleanupOptionImplementors = []string{"CleanupOption"}
 
 func (ec *executionContext) _CleanupOption(ctx context.Context, sel ast.SelectionSet, obj *biz.CleanupOption) graphql.Marshaler {
@@ -104044,6 +104528,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "bulkAddChannelModels":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_bulkAddChannelModels(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cleanInvalidChannelModels":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_cleanInvalidChannelModels(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -108614,6 +109105,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_discoverChannelModelCandidates(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "cleanInvalidChannelModelsStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_cleanInvalidChannelModelsStatus(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -117199,6 +117712,20 @@ func (ec *executionContext) marshalNBrandSettings2ᚖgithubᚗcomᚋloopljᚋaxo
 	return ec._BrandSettings(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNBulkAddChannelModelsPayload2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	return ec._BulkAddChannelModelsPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBulkAddChannelModelsPayload2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v *biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BulkAddChannelModelsPayload(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBulkAutoDisableAction2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAutoDisableAction(ctx context.Context, v any) (biz.BulkAutoDisableAction, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := biz.BulkAutoDisableAction(tmp)
@@ -117214,20 +117741,6 @@ func (ec *executionContext) marshalNBulkAutoDisableAction2githubᚗcomᚋlooplj�
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) marshalNBulkAddChannelModelsPayload2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v biz.BulkAddChannelModelsPayload) graphql.Marshaler {
-	return ec._BulkAddChannelModelsPayload(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNBulkAddChannelModelsPayload2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v *biz.BulkAddChannelModelsPayload) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._BulkAddChannelModelsPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBulkCreateChannelsInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkCreateChannelsInput(ctx context.Context, v any) (biz.BulkCreateChannelsInput, error) {
@@ -118314,6 +118827,20 @@ func (ec *executionContext) marshalNClaudeCodeSafeguardsSettings2ᚖgithubᚗcom
 		return graphql.Null
 	}
 	return ec._ClaudeCodeSafeguardsSettings(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCleanInvalidChannelModelsStatus2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCleanInvalidChannelModelsStatus(ctx context.Context, sel ast.SelectionSet, v biz.CleanInvalidChannelModelsStatus) graphql.Marshaler {
+	return ec._CleanInvalidChannelModelsStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCleanInvalidChannelModelsStatus2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCleanInvalidChannelModelsStatus(ctx context.Context, sel ast.SelectionSet, v *biz.CleanInvalidChannelModelsStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CleanInvalidChannelModelsStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNCleanupOption2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCleanupOption(ctx context.Context, sel ast.SelectionSet, v biz.CleanupOption) graphql.Marshaler {

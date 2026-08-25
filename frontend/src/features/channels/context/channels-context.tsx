@@ -19,6 +19,7 @@ type ChannelsDialogType =
   | 'archive'
   | 'bulkOrdering'
   | 'bulkAddModels'
+  | 'cleanInvalidModels'
   | 'bulkArchive'
   | 'bulkDisable'
   | 'bulkEnable'

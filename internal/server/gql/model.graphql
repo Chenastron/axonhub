@@ -247,6 +247,17 @@ type BulkAddChannelModelsPayload {
   addedAssociations: Int!
 }
 
+type CleanInvalidChannelModelsStatus {
+  running: Boolean!
+  scanned: Int!
+  cleaned: Int!
+  removedAssociations: Int!
+  failures: [ChannelModelDiscoveryFailure!]!
+  finished: Boolean!
+  error: String!
+  total: Int!
+}
+
 extend type Model {
   associatedChannelCount: Int! @goField(forceResolver: true)
 }
@@ -254,6 +265,7 @@ extend type Model {
 extend type Query {
   fetchModels(input: FetchModelsInput!): FetchModelsPayload!
   discoverChannelModelCandidates(modelName: String!): ChannelModelDiscoveryResult!
+  cleanInvalidChannelModelsStatus: CleanInvalidChannelModelsStatus!
   queryModels(input: QueryModelsInput!): [ModelIdentityWithStatus!]!
   queryModelChannelConnections(
     associations: [ModelAssociationInput!]!
@@ -271,5 +283,6 @@ extend type Mutation {
   bulkDisableModels(ids: [ID!]!): Boolean!
   bulkEnableModels(ids: [ID!]!): Boolean!
   bulkAddChannelModels(selections: [ChannelModelAddSelectionInput!]!): BulkAddChannelModelsPayload!
+  cleanInvalidChannelModels: CleanInvalidChannelModelsStatus!
   bulkDeleteModels(ids: [ID!]!): Boolean!
 }

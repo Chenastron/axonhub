@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { IconPlus, IconUpload, IconArrowsSort, IconSettings, IconScale, IconTemplate } from '@tabler/icons-react';
-import { ListPlus } from 'lucide-react';
+import { ListPlus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { PermissionGuard } from '@/components/permission-guard';
@@ -58,6 +58,15 @@ export function ChannelsPrimaryButtons() {
             data-testid='bulk-add-channel-models-button'
           >
             <span>{t('channels.bulkAddModels.action')}</span> <ListPlus size={18} />
+          </Button>
+
+          <Button
+            variant='outline'
+            className='shrink-0 space-x-1 text-destructive hover:text-destructive hover:bg-destructive/5'
+            onClick={() => setOpen('cleanInvalidModels')}
+            data-testid='clean-invalid-models-button'
+          >
+            <span>{t('channels.cleanInvalidModels.action', '清理失效模型')}</span> <Trash2 size={18} />
           </Button>
 
           {/* Add Channel - requires write_channels permission */}
