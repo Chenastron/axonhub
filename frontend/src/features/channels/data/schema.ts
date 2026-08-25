@@ -780,7 +780,7 @@ export const updateChannelInputSchema = z
     baseURL: z.string().url('Please enter a valid URL').optional(),
     name: z.string().min(1, 'Name is required').optional(),
     policies: channelPoliciesSchema.optional(),
-    supportedModels: z.array(z.string()).min(1, 'At least one supported model is required').optional(),
+    supportedModels: z.array(z.string()).min(0, 'At least one supported model is required').optional(),
     autoSyncSupportedModels: z.boolean().optional(),
     autoSyncModelPattern: z.string().optional(),
     manualModels: z.array(z.string()).optional().nullable(),
