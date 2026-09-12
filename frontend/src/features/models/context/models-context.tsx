@@ -13,6 +13,8 @@ type DialogType =
   | 'bulkEnable'
   | 'bulkDisable'
   | 'unassociated'
+  | 'sync'
+  | 'syncAll'
   | null;
 
 interface ModelsContextType {

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { SortingState } from '@tanstack/react-table';
-import { IconPlus, IconSettings, IconAlertCircle } from '@tabler/icons-react';
+import { IconPlus, IconSettings, IconAlertCircle, IconRefresh } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useDebounce } from '@/hooks/use-debounce';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -129,12 +129,25 @@ function DetectUnassociatedButton() {
   );
 }
 
+function SyncAllButton() {
+  const { t } = useTranslation();
+  const { setOpen } = useModels();
+
+  return (
+    <Button variant='outline' onClick={() => setOpen('syncAll')}>
+      <IconRefresh className='mr-2 h-4 w-4' />
+      {t('models.actions.syncAllModelCards')}
+    </Button>
+  );
+}
+
 function ActionButtons() {
   const scrollRef = useHorizontalScroll<HTMLDivElement>();
   return (
     <div ref={scrollRef} onFocusCapture={revealFocusedHorizontalButton} data-testid='model-actions-scroller' className='flex min-w-0 max-w-full gap-2 overflow-x-auto p-1'>
       <PermissionGuard requiredScope='write_channels'>
         <>
+          <SyncAllButton />
           <DetectUnassociatedButton />
           <SettingsButton />
           <BulkAddButton />
