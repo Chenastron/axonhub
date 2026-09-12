@@ -3,7 +3,8 @@ import { toast } from 'sonner';
 import { graphqlRequest } from '@/gql/graphql';
 import i18n from '@/lib/i18n';
 import providersDataRaw from './providers.json';
-import { providersDataSchema, type ProvidersData } from './providers.schema';
+import { providersDataSchema, type ProvidersData, type ProviderModel, resolveVision } from './providers.schema';
+import type { ModelCard } from './schema';
 
 const fallbackProvidersData = providersDataSchema.parse(providersDataRaw);
 
@@ -128,4 +129,95 @@ export function useRefreshProvidersCatalog() {
       toast.error(i18n.t('models.catalog.refreshFailed'));
     },
   });
+}
+
+/**
+ * Find a provider model by developer id and model id from providers data.
+ * Returns null if not found.
+ */
+export function findProviderModel(
+  providersData: ProvidersData | undefined,
+  developer: string,
+  modelID: string
+): ProviderModel | null {
+  if (!providersData) return null;
+  const provider = providersData.providers[developer];
+  if (!provider?.models?.length) return null;
+  return provider.models.find((m) => m.id === modelID) ?? null;
+}
+
+/**
+ * Build a ModelCard from a ProviderModel, mirroring the logic used when adding
+ * a model in ModelsActionDialog. Keeps reasoning, toolCall, temperature,
+ * modalities, vision, cost, limit and dates in sync with the upstream provider
+ * data.
+ */
+export function buildModelCardFromProviderModel(
+  model: ProviderModel
+): ModelCard {
+  return {
+    reasoning: {
+      supported: model.reasoning?.supported || false,
+      default: model.reasoning?.default || false,
+    },
+    toolCall: model.tool_call,
+    temperature: model.temperature,
+    modalities: {
+      input: model.modalities?.input || [],
+      output: model.modalities?.output || [],
+    },
+    vision: resolveVision(model),
+    cost: {
+      input: model.cost?.input || 0,
+      output: model.cost?.output || 0,
+      cacheRead: model.cost?.cache_read,
+      cacheWrite: model.cost?.cache_write,
+    },
+    limit: {
+      context: model.limit?.context || 0,
+      output: model.limit?.output || 0,
+    },
+    knowledge: model.knowledge,
+    releaseDate: model.release_date,
+    lastUpdated: model.last_updated,
+  };
+}
+
+/**
+ * Shallow equality check for two ModelCard objects used to detect whether a
+ * sync would actually change anything.
+ */
+export function isModelCardEqual(a?: ModelCard, b?: ModelCard): boolean {
+  if (!a || !b) return a === b;
+
+  const normalize = (card: ModelCard) => {
+    return {
+      reasoning: {
+        supported: !!card.reasoning?.supported,
+        default: !!card.reasoning?.default,
+      },
+      toolCall: !!card.toolCall,
+      temperature: !!card.temperature,
+      modalities: {
+        input: [...(card.modalities?.input || [])].sort(),
+        output: [...(card.modalities?.output || [])].sort(),
+      },
+      vision: !!card.vision,
+      cost: {
+        input: card.cost?.input || 0,
+        output: card.cost?.output || 0,
+        cacheRead: card.cost?.cacheRead || 0,
+        cacheWrite: card.cost?.cacheWrite || 0,
+      },
+      limit: {
+        context: card.limit?.context || 0,
+        output: card.limit?.output || 0,
+      },
+      knowledge: card.knowledge || '',
+      releaseDate: card.releaseDate || '',
+      lastUpdated: card.lastUpdated || '',
+    };
+  };
+
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
 }

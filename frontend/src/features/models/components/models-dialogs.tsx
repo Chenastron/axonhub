@@ -6,6 +6,8 @@ import { ModelsBatchCreateDialog } from './models-batch-create-dialog';
 import { ModelsBulkDisableDialog } from './models-bulk-disable-dialog';
 import { ModelsBulkEnableDialog } from './models-bulk-enable-dialog';
 import { ModelsDeleteDialog } from './models-delete-dialog';
+import { ModelsSyncModelCardDialog } from './models-sync-model-card-dialog';
+import { ModelsSyncAllDialog } from './models-sync-all-dialog';
 import { ModelSettingsDialog } from './models-settings-dialog';
 import { ModelsUnassociatedDialog } from './models-unassociated-dialog';
 
@@ -19,6 +21,8 @@ export function ModelsDialogs() {
       {open === 'delete' && <ModelsDeleteDialog />}
       {open === 'archive' && <ModelsArchiveDialog />}
       {(open === 'association' || open === 'developerAssociation') && <ModelsAssociationDialog />}
+      {open === 'sync' && <ModelsSyncModelCardDialog />}
+      {open === 'syncAll' && <ModelsSyncAllDialog />}
       {open === 'settings' && <ModelSettingsDialog />}
       {open === 'unassociated' && <ModelsUnassociatedDialog />}
       <ModelsBulkDisableDialog />

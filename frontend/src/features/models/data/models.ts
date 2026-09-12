@@ -567,13 +567,15 @@ export function useUpdateModel() {
   const { handleError } = useErrorHandler();
 
   return useMutation({
-    mutationFn: async ({ id, input }: { id: string; input: UpdateModelInput }) => {
+    mutationFn: async ({ id, input }: { id: string; input: UpdateModelInput; silent?: boolean }) => {
       const data = await graphqlRequest<{ updateModel: Model }>(UPDATE_MODEL_MUTATION, { id, input });
       return modelSchema.parse(data.updateModel);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['models'] });
-      toast.success(t('models.messages.updateSuccess'));
+      if (!variables.silent) {
+        toast.success(t('models.messages.updateSuccess'));
+      }
     },
     onError: (error) => {
       handleError(error, { context: t('models.dialogs.edit.title') });
