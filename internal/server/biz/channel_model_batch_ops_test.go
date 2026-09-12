@@ -222,8 +222,8 @@ func TestModelFetcher_CleanInvalidChannelModels(t *testing.T) {
 
 	require.Equal(t, 3, payload.Scanned)
 	require.Equal(t, 3, payload.Total)
-	require.Equal(t, 1, payload.Cleaned)
-	require.Equal(t, 1, payload.RemovedAssociations)
+	require.Equal(t, 2, payload.Cleaned)
+	require.Equal(t, 2, payload.RemovedAssociations)
 	require.Len(t, payload.Failures, 1)
 	require.Equal(t, chC.ID, payload.Failures[0].ChannelID)
 
@@ -233,7 +233,7 @@ func TestModelFetcher_CleanInvalidChannelModels(t *testing.T) {
 
 	chB, err = client.Channel.Get(ctx, chB.ID)
 	require.NoError(t, err)
-	require.Equal(t, []string{"model-1"}, chB.SupportedModels)
+	require.Nil(t, chB.SupportedModels)
 
 	chC, err = client.Channel.Get(ctx, chC.ID)
 	require.NoError(t, err)

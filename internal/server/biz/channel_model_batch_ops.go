@@ -359,12 +359,6 @@ func (f *ModelFetcher) runCleanInvalidChannelModelsBackground(ctx context.Contex
 			continue
 		}
 
-		// Only clean if we fetched a non-empty list of upstream models.
-		// If upstream returns empty, we skip to prevent accidental complete wipe of configured models.
-		if len(fetched.models) == 0 {
-			continue
-		}
-
 		upstreamModels := make(map[string]bool, len(fetched.models))
 		for _, model := range fetched.models {
 			upstreamModels[model.ID] = true
@@ -380,7 +374,8 @@ func (f *ModelFetcher) runCleanInvalidChannelModelsBackground(ctx context.Contex
 			}
 		}
 
-		if removedCount > 0 {
+		if removedCount > 0 || len(fetched.channel.SupportedModels) > 0 && len(fetched.models) == 0 {
+			// If upstream models list is empty, nextModels will be empty (completely cleaned)
 			channelUpdates[fetched.channel.ID] = nextModels
 		}
 	}
