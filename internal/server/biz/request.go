@@ -1271,11 +1271,15 @@ func (s *RequestService) MarkRequestFailed(ctx context.Context, requestID int) e
 func (s *RequestService) UpdateRequestStatus(ctx context.Context, requestID int, status request.Status) error {
 	client := s.entFromContext(ctx)
 
-	_, err := client.Request.UpdateOneID(requestID).
+	req, err := client.Request.UpdateOneID(requestID).
 		SetStatus(status).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update request status: %w", err)
+	}
+
+	if status == request.StatusFailed {
+		s.clearPreviousChannelForRequest(ctx, req)
 	}
 
 	return nil
@@ -1790,6 +1794,40 @@ func (s *RequestService) setPreviousThreadChannelID(ctx context.Context, threadI
 
 func (s *RequestService) setPreviousChannelCache(ctx context.Context, cacheKey string, channelID int, expiration time.Duration) {
 	_ = s.previousChannelCache.Set(ctx, cacheKey, channelID, store.WithExpiration(expiration))
+}
+
+func (s *RequestService) clearPreviousChannelForRequest(ctx context.Context, req *ent.Request) {
+	if req == nil || req.TraceID == 0 {
+		return
+	}
+
+	s.deletePreviousTraceChannelID(ctx, req.TraceID)
+
+	threadID := 0
+	if currentTrace, ok := contexts.GetTrace(ctx); ok && currentTrace.ID == req.TraceID {
+		threadID = currentTrace.ThreadID
+	}
+
+	if threadID == 0 {
+		currentTrace, err := s.entFromContext(ctx).Trace.Get(ctx, req.TraceID)
+		if err != nil {
+			log.Warn(ctx, "failed to get trace for clearing previous channel cache", log.Cause(err), log.Int("trace_id", req.TraceID))
+			return
+		}
+		threadID = currentTrace.ThreadID
+	}
+
+	if threadID != 0 {
+		s.deletePreviousThreadChannelID(ctx, threadID)
+	}
+}
+
+func (s *RequestService) deletePreviousTraceChannelID(ctx context.Context, traceID int) {
+	_ = s.previousChannelCache.Delete(ctx, buildPreviousTraceChannelCacheKey(traceID))
+}
+
+func (s *RequestService) deletePreviousThreadChannelID(ctx context.Context, threadID int) {
+	_ = s.previousChannelCache.Delete(ctx, buildPreviousThreadChannelCacheKey(threadID))
 }
 
 func buildPreviousTraceChannelCacheKey(traceID int) string {
