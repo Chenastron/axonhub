@@ -163,3 +163,32 @@ func TestRequestService_PreviousChannelUsesRedisCache(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, channelEntity.ID, channelID)
 }
+
+func TestRequestService_PreviousChannelCacheClearedOnRequestFailed(t *testing.T) {
+	cacheConfig := xcache.Config{Mode: xcache.ModeMemory}
+	ctx, client, service := newRequestStickyTestService(t, cacheConfig, cacheConfig)
+	threadEntity, traceEntity, channelEntity := createRequestStickyScope(t, ctx, client)
+	req := createStickyRequest(t, ctx, client, traceEntity.ID, channelEntity.ID, request.StatusProcessing, time.Now())
+
+	require.NoError(t, service.UpdateRequestChannelID(ctx, req.ID, channelEntity.ID))
+
+	// Verify it is cached
+	channelID, err := service.GetPreviousChannelID(ctx, traceEntity.ID)
+	require.NoError(t, err)
+	require.Equal(t, channelEntity.ID, channelID)
+
+	channelID, err = service.GetPreviousChannelIDByThread(ctx, threadEntity.ID)
+	require.NoError(t, err)
+	require.Equal(t, channelEntity.ID, channelID)
+
+	// When request is marked failed, previous channel cache should be cleared
+	require.NoError(t, service.UpdateRequestStatus(ctx, req.ID, request.StatusFailed))
+
+	channelID, err = service.GetPreviousChannelID(ctx, traceEntity.ID)
+	require.NoError(t, err)
+	require.Zero(t, channelID)
+
+	channelID, err = service.GetPreviousChannelIDByThread(ctx, threadEntity.ID)
+	require.NoError(t, err)
+	require.Zero(t, channelID)
+}
