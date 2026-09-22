@@ -107,7 +107,7 @@ AxonHub is an all-in-one AI development platform that serves as a unified API ga
 
 ## Database Query Methods
 
-When you need to inspect request details, executions, or other data stored in the database, use `psql` directly against the PostgreSQL database.
+When you need to inspect request metadata, executions, or other data stored in the database, use `psql` directly against the PostgreSQL database.
 
 ### Connection
 
@@ -125,11 +125,20 @@ PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover
 
 | Table | Description |
 |-------|-------------|
-| `requests` | Main request records, request/response body, chunks, status |
+| `requests` | Main request records, status/metrics. Body fields are `{}` placeholders when external storage is enabled |
 | `request_executions` | Per-channel execution attempts (one request may have multiple retries) |
 | `usage_logs` | Token usage and cost breakdown per request |
 | `channels` | Channel configuration |
 | `provider_quota_status` | Quota status cache for each channel |
+
+### Request/Response Body Storage (Local FS)
+
+Request and response bodies are **not stored in the database** — they are saved to the external file storage `local-fs` (type `fs`), configured in the frontend data-storages page, rooted at `/vol1/1000/axonhub-data`:
+
+- **Layout**: `/vol1/1000/axonhub-data/<project_id>/requests/<request_id>/{request_body.json, response_body.json, response_chunks.json}` and `.../requests/<request_id>/executions/<execution_id>/...` for per-execution bodies.
+- **Activation**: requests with `requests.data_storage_id = 3` (the `local-fs` storage) store bodies in files; in the DB their `request_body` is just `{}` and `response_body`/`response_chunks` are NULL. Older requests (id ≤ 5855, `data_storage_id = 1`) still have full bodies in the DB.
+- **Logic**: `shouldUseExternalStorage` in `internal/server/biz/request.go` — any non-primary (non-database) data storage stores bodies externally.
+- To read a request's actual body/chunks, read the JSON files directly from the layout above; use the DB only for metadata.
 
 ### Common Queries
 
@@ -151,15 +160,17 @@ PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c 
 " -x
 ```
 
-**3. View request headers and body type:**
+**3. Check whether bodies are in DB or external storage:**
 ```bash
 PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c ""
-  SELECT id, jsonb_typeof(request_body) as body_type,
-         (request_body->>'model') as model,
-         jsonb_array_length(request_body->'messages') as msg_count
+  SELECT id, data_storage_id,
+         jsonb_typeof(request_body) as body_type,
+         length(request_body::text) as body_len
   FROM requests WHERE id = <ID>
 " -x
 ```
+If `data_storage_id` points to a non-primary storage (e.g. `3` = local-fs), read the actual
+bodies from `/vol1/1000/axonhub-data/<project_id>/requests/<ID>/` instead of the DB.
 
 **4. Check usage logs (token counts and cost):**
 ```bash
@@ -175,7 +186,7 @@ PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c 
 ### Notes
 
 - The `-x` flag enables expanded/vertical output (each column on its own line), useful for wide tables.
-- `response_body` and `response_chunks` are JSONB columns — use `left()` or `right()` SQL functions to preview without fetching the full content.
+- `response_body` and `response_chunks` are JSONB columns — for old requests stored in DB, use `left()` or `right()` SQL functions to preview without fetching the full content. For new requests (external storage) these columns are NULL/`{}` placeholders; read the files under `/vol1/1000/axonhub-data` instead.
 - Execution records are created for each retry attempt; the same request_id can have multiple executions.
 - When a request is canceled by the client mid-flight, the status is `canceled` and subsequent operations may fail with `context canceled` errors.
 
