@@ -29,11 +29,6 @@ func (r *channelModelDiscoveryFailureResolver) ChannelID(ctx context.Context, ob
 	return &objects.GUID{Type: ent.TypeChannel, ID: obj.ChannelID}, nil
 }
 
-// Total is the resolver for the total field.
-func (r *cleanInvalidChannelModelsStatusResolver) Total(ctx context.Context, obj *biz.CleanInvalidChannelModelsStatus) (int, error) {
-	return obj.Total, nil
-}
-
 // AssociatedChannelCount is the resolver for the associatedChannelCount field.
 func (r *modelResolver) AssociatedChannelCount(ctx context.Context, obj *ent.Model) (int, error) {
 	return r.modelService.CountModelAssociatedChannels(ctx, obj)
@@ -256,11 +251,21 @@ func (r *Resolver) ChannelModelDiscoveryFailure() ChannelModelDiscoveryFailureRe
 	return &channelModelDiscoveryFailureResolver{r}
 }
 
-// CleanInvalidChannelModelsStatus returns CleanInvalidChannelModelsStatusResolver implementation.
+type channelModelCandidateChannelResolver struct{ *Resolver }
+type channelModelDiscoveryFailureResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *cleanInvalidChannelModelsStatusResolver) Total(ctx context.Context, obj *biz.CleanInvalidChannelModelsStatus) (int, error) {
+	return obj.Total, nil
+}
 func (r *Resolver) CleanInvalidChannelModelsStatus() CleanInvalidChannelModelsStatusResolver {
 	return &cleanInvalidChannelModelsStatusResolver{r}
 }
-
-type channelModelCandidateChannelResolver struct{ *Resolver }
-type channelModelDiscoveryFailureResolver struct{ *Resolver }
 type cleanInvalidChannelModelsStatusResolver struct{ *Resolver }
+*/

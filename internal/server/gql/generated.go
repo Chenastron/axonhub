@@ -77,7 +77,6 @@ type ResolverRoot interface {
 	ChannelProbe() ChannelProbeResolver
 	ChannelProbeData() ChannelProbeDataResolver
 	ChannelSettings() ChannelSettingsResolver
-	CleanInvalidChannelModelsStatus() CleanInvalidChannelModelsStatusResolver
 	DataStorage() DataStorageResolver
 	Model() ModelResolver
 	Mutation() MutationResolver
@@ -1024,8 +1023,8 @@ type ComplexityRoot struct {
 		ArchiveThread                         func(childComplexity int, id objects.GUID) int
 		ArchiveTrace                          func(childComplexity int, id objects.GUID) int
 		Backup                                func(childComplexity int, input backup.BackupOptions) int
-		BulkAddChannelTags                    func(childComplexity int, ids []*objects.GUID, tags []string) int
 		BulkAddChannelModels                  func(childComplexity int, selections []*biz.ChannelModelAddSelectionInput) int
+		BulkAddChannelTags                    func(childComplexity int, ids []*objects.GUID, tags []string) int
 		BulkArchiveAPIKeys                    func(childComplexity int, ids []*objects.GUID) int
 		BulkArchiveChannels                   func(childComplexity int, ids []*objects.GUID) int
 		BulkArchiveModels                     func(childComplexity int, ids []*objects.GUID) int
@@ -2292,9 +2291,6 @@ type ChannelSettingsResolver interface {
 	BodyOverrideOperations(ctx context.Context, obj *objects.ChannelSettings) ([]*objects.OverrideOperation, error)
 
 	ProviderQuota(ctx context.Context, obj *objects.ChannelSettings) (*objects.ChannelProviderQuotaSettings, error)
-}
-type CleanInvalidChannelModelsStatusResolver interface {
-	Total(ctx context.Context, obj *biz.CleanInvalidChannelModelsStatus) (int, error)
 }
 type DataStorageResolver interface {
 	ID(ctx context.Context, obj *ent.DataStorage) (*objects.GUID, error)
@@ -6099,17 +6095,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Backup(childComplexity, args["input"].(backup.BackupOptions)), true
-	case "Mutation.bulkAddChannelTags":
-		if e.complexity.Mutation.BulkAddChannelTags == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_bulkAddChannelTags_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.BulkAddChannelTags(childComplexity, args["ids"].([]*objects.GUID), args["tags"].([]string)), true
 	case "Mutation.bulkAddChannelModels":
 		if e.complexity.Mutation.BulkAddChannelModels == nil {
 			break
@@ -6121,6 +6106,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.BulkAddChannelModels(childComplexity, args["selections"].([]*biz.ChannelModelAddSelectionInput)), true
+	case "Mutation.bulkAddChannelTags":
+		if e.complexity.Mutation.BulkAddChannelTags == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_bulkAddChannelTags_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.BulkAddChannelTags(childComplexity, args["ids"].([]*objects.GUID), args["tags"].([]string)), true
 	case "Mutation.bulkArchiveAPIKeys":
 		if e.complexity.Mutation.BulkArchiveAPIKeys == nil {
 			break
@@ -12701,6 +12697,17 @@ func (ec *executionContext) field_Mutation_backup_args(ctx context.Context, rawA
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_bulkAddChannelModels_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "selections", ec.unmarshalNChannelModelAddSelectionInput2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInputᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["selections"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_bulkAddChannelTags_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -12714,17 +12721,6 @@ func (ec *executionContext) field_Mutation_bulkAddChannelTags_args(ctx context.C
 		return nil, err
 	}
 	args["tags"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_bulkAddChannelModels_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "selections", ec.unmarshalNChannelModelAddSelectionInput2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐChannelModelAddSelectionInputᚄ)
-	if err != nil {
-		return nil, err
-	}
-	args["selections"] = arg0
 	return args, nil
 }
 
@@ -27314,7 +27310,7 @@ func (ec *executionContext) _CleanInvalidChannelModelsStatus_total(ctx context.C
 		field,
 		ec.fieldContext_CleanInvalidChannelModelsStatus_total,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.CleanInvalidChannelModelsStatus().Total(ctx, obj)
+			return obj.Total, nil
 		},
 		nil,
 		ec.marshalNInt2int,
@@ -27327,8 +27323,8 @@ func (ec *executionContext) fieldContext_CleanInvalidChannelModelsStatus_total(_
 	fc = &graphql.FieldContext{
 		Object:     "CleanInvalidChannelModelsStatus",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
 		},
@@ -98371,74 +98367,43 @@ func (ec *executionContext) _CleanInvalidChannelModelsStatus(ctx context.Context
 		case "running":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_running(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "scanned":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_scanned(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "cleaned":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_cleaned(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "removedAssociations":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_removedAssociations(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "failures":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_failures(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "finished":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_finished(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "error":
 			out.Values[i] = ec._CleanInvalidChannelModelsStatus_error(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "total":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._CleanInvalidChannelModelsStatus_total(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._CleanInvalidChannelModelsStatus_total(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -115122,6 +115087,20 @@ func (ec *executionContext) marshalNBrandSettings2ᚖgithubᚗcomᚋloopljᚋaxo
 	return ec._BrandSettings(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNBulkAddChannelModelsPayload2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	return ec._BulkAddChannelModelsPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBulkAddChannelModelsPayload2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v *biz.BulkAddChannelModelsPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BulkAddChannelModelsPayload(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBulkAutoDisableAction2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAutoDisableAction(ctx context.Context, v any) (biz.BulkAutoDisableAction, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := biz.BulkAutoDisableAction(tmp)
@@ -115137,20 +115116,6 @@ func (ec *executionContext) marshalNBulkAutoDisableAction2githubᚗcomᚋlooplj�
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) marshalNBulkAddChannelModelsPayload2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v biz.BulkAddChannelModelsPayload) graphql.Marshaler {
-	return ec._BulkAddChannelModelsPayload(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNBulkAddChannelModelsPayload2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkAddChannelModelsPayload(ctx context.Context, sel ast.SelectionSet, v *biz.BulkAddChannelModelsPayload) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._BulkAddChannelModelsPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBulkCreateChannelsInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐBulkCreateChannelsInput(ctx context.Context, v any) (biz.BulkCreateChannelsInput, error) {
