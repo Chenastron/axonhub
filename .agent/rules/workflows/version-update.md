@@ -24,14 +24,12 @@ When switching the codebase to a different version and updating the running syst
    * Push the rebased branch to the fork to keep the remote backup in sync: `git push origin my-branch --force-with-lease` (rebase rewrites history, so a plain push will be rejected).
    * Re-run `git branch --show-current` and stop with an error if the result is not `my-branch`.
 
-3. **Version number update**
-   * Update `internal/build/VERSION` to the target version with a `-fix` suffix, for example `v1.0.0-beta11-fix`. Note that this file should only be modified after a successful rebase and before running `make build`. This version is compiled into the binary and displayed in system logs.
-
-4. **Code build**
+3. **Code build**
    * From the repository root, run the project build command, for example `make build`, to package frontend static assets, sync static files, and compile the Go backend into the latest `axonhub` executable.
-   * **Note**: Step 3 must be completed before running `make build`; otherwise the compiled binary may contain the wrong version number.
+   * The Makefile automatically injects the base official tag (from `git describe --tags --abbrev=0`) into the backend via ldflags (`internal/build.Version`), matching how goreleaser injects the git tag into official release binaries. Rebuilding after local modifications keeps the same version; it only changes after rebasing onto a new release tag. An explicit `make build VERSION=<tag>` override is available but normally unnecessary.
+   * Do not modify `internal/build/VERSION` — it is maintained upstream, lags behind tags, and is only a fallback for builds outside this repository (e.g. docker builds without git metadata).
 
-5. **Hot reload and deploy the new service**
+4. **Hot reload and deploy the new service**
    * To avoid gateway disconnection caused by manually executing stop and start sequentially (especially when the AI assistant itself relies on this gateway), you must use the atomic script to stop, deploy, and launch the service in one go.
    * Run the restart script: `bash restart.sh`.
    * Check the startup status and logs to ensure the new version starts correctly.

@@ -17,10 +17,22 @@ generate-openapi:
 	cd internal/server/gql/openapi && go generate
 	@echo "Generation completed!"
 
+# Version injected via ldflags so local builds report the real version.
+# Priority: explicit `make build VERSION=x` > base official tag from git > embedded VERSION file.
+# git describe --abbrev=0 returns the nearest reachable tag (the base official tag),
+# which stays stable across local commits and rebuilds, and only changes after
+# rebasing onto a new release tag.
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null)
+ifeq ($(strip $(VERSION)),)
+LDFLAGS_VERSION :=
+else
+LDFLAGS_VERSION := -X github.com/looplj/axonhub/internal/build.Version=$(VERSION)
+endif
+
 # Build the backend application
 build-backend:
 	@echo "Building axonhub backend..."
-	go build -ldflags "-s -w" -tags=nomsgpack -o axonhub ./cmd/axonhub
+	go build -ldflags "-s -w $(LDFLAGS_VERSION)" -tags=nomsgpack -o axonhub ./cmd/axonhub
 	@echo "Backend build completed!"
 
 # Build the frontend application
