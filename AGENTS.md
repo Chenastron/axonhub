@@ -19,42 +19,13 @@ After modifying code, verify and apply the change with the following commands fr
 2. If the build succeeds, run `bash restart.sh`.
 3. If either command fails, report the failure and relevant output to the user.
 
-## Version Update Workflow
-
-When switching the codebase to a different version and updating the running system, follow these steps strictly:
-
-1. **Version check and decision**
-   * Check the local code version tag and the latest tag in the remote repository, for example with `git tag -l` or `git fetch --tags`.
-   * Do not inspect the contents of the unstable branch; only inspect tags.
-   * If the locally running version is older than the target version, continue with the update workflow. Otherwise, do nothing and report the current status to the user.
-
-2. **Rebase `my-branch` onto the target tag and preserve local commits**
-   * The repository must not be left in a detached HEAD state. Before and after every version update, `git branch --show-current` must report `my-branch`.
-   * Switch to the persistent local branch with `git switch my-branch`. If it does not exist yet, create it from the current local commit with `git switch -c my-branch` before continuing.
-   * Discard any build-related local files in the workspace (e.g., `git restore frontend/pnpm-lock.yaml internal/build/VERSION`) before rebasing. This ensures there are no conflicts on lockfiles or version config files.
-   * Save other uncommitted custom changes, including untracked files, with `git stash push -u`.
-   * Identify the old version tag that `my-branch` is currently based on and review the local custom commits after it with `git log <old-tag>..my-branch`.
-   * Do not check out the target tag directly. Rebase the existing local commits onto the target tag while staying on `my-branch`, for example: `git rebase --onto <target-tag> <old-tag> my-branch`.
-   * Resolve any rebase conflicts on your custom features without dropping local custom changes. Do not replace this workflow with checkout-and-cherry-pick.
-   * Restore the saved workspace changes with `git stash pop`, resolve any resulting conflicts, and confirm that the target tag is an ancestor of `my-branch` with `git merge-base --is-ancestor <target-tag> my-branch`.
-   * Re-run `git branch --show-current` and stop with an error if the result is not `my-branch`.
-
-3. **Version number update**
-   * Update `internal/build/VERSION` to the target version with a `-fix` suffix, for example `v1.0.0-beta7-fix`. Note that this file should only be modified after a successful rebase and before running `make build`. This version is compiled into the binary and displayed in system logs.
-
-4. **Code build**
-   * From the repository root, run the project build command, for example `make build`, to package frontend static assets, sync static files, and compile the Go backend into the latest `axonhub` executable.
-   * **Note**: Step 3 must be completed before running `make build`; otherwise the compiled binary may contain the wrong version number.
-
-5. **Hot reload and deploy the new service**
-   * To avoid gateway disconnection caused by manually executing stop and start sequentially (especially when the AI assistant itself relies on this gateway), you must use the atomic script to stop, deploy, and launch the service in one go.
-   * Run the restart script: `bash restart.sh`.
-   * Check the startup status and logs to ensure the new version starts correctly.
-
 ## Configuration
 
 - Backend API: port 8090, Frontend dev server: port 5173 (proxies to backend).
 - Configuration: `conf/conf.go` (YAML + env var), SQLite by default.
+- Updating to a new version tag: follow [.agent/rules/workflows/version-update.md](.agent/rules/workflows/version-update.md).
+- Refreshing the models page catalog: follow [.agent/rules/workflows/model-data-sync.md](.agent/rules/workflows/model-data-sync.md).
+- Inspecting request/execution/usage data: follow [.agent/rules/db-debugging.md](.agent/rules/db-debugging.md).
 
 ## Project Overview
 
@@ -105,91 +76,6 @@ AxonHub is an all-in-one AI development platform that serves as a unified API ga
 - `frontend/src/config/` — App configuration
 - `frontend/src/context/` — React context providers
 
-## Database Query Methods
-
-When you need to inspect request metadata, executions, or other data stored in the database, use `psql` directly against the PostgreSQL database.
-
-### Connection
-
-```bash
-PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover
-```
-
-- **Dialect**: PostgreSQL
-- **Socket**: Unix socket at `/var/run/postgresql/.s.PGSQL.5432`
-- **User**: `axonhub`
-- **Password**: `axonhub`
-- **Database**: `axonhub_recover`
-
-### Key Tables for Request Debugging
-
-| Table | Description |
-|-------|-------------|
-| `requests` | Main request records, status/metrics. Body fields are `{}` placeholders when external storage is enabled |
-| `request_executions` | Per-channel execution attempts (one request may have multiple retries) |
-| `usage_logs` | Token usage and cost breakdown per request |
-| `channels` | Channel configuration |
-| `provider_quota_status` | Quota status cache for each channel |
-
-### Request/Response Body Storage (Local FS)
-
-Request and response bodies are **not stored in the database** — they are saved to the external file storage `local-fs` (type `fs`), configured in the frontend data-storages page, rooted at `/vol1/1000/axonhub-data`:
-
-- **Layout**: `/vol1/1000/axonhub-data/<project_id>/requests/<request_id>/{request_body.json, response_body.json, response_chunks.json}` and `.../requests/<request_id>/executions/<execution_id>/...` for per-execution bodies.
-- **Activation**: requests with `requests.data_storage_id = 3` (the `local-fs` storage) store bodies in files; in the DB their `request_body` is just `{}` and `response_body`/`response_chunks` are NULL. Older requests (id ≤ 5855, `data_storage_id = 1`) still have full bodies in the DB.
-- **Logic**: `shouldUseExternalStorage` in `internal/server/biz/request.go` — any non-primary (non-database) data storage stores bodies externally.
-- To read a request's actual body/chunks, read the JSON files directly from the layout above; use the DB only for metadata.
-
-### Common Queries
-
-**1. Quick request overview:**
-```bash
-PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c ""
-  SELECT id, model_id, format, status, stream, client_ip,
-         metrics_latency_ms, channel_id, created_at, updated_at
-  FROM requests WHERE id = <ID>
-" -x
-```
-
-**2. List all executions for a request (retries/failures):**
-```bash
-PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c ""
-  SELECT id, request_id, status, channel_id, error_message,
-         response_status_code, created_at, updated_at
-  FROM request_executions WHERE request_id = <ID> ORDER BY created_at
-" -x
-```
-
-**3. Check whether bodies are in DB or external storage:**
-```bash
-PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c ""
-  SELECT id, data_storage_id,
-         jsonb_typeof(request_body) as body_type,
-         length(request_body::text) as body_len
-  FROM requests WHERE id = <ID>
-" -x
-```
-If `data_storage_id` points to a non-primary storage (e.g. `3` = local-fs), read the actual
-bodies from `/vol1/1000/axonhub-data/<project_id>/requests/<ID>/` instead of the DB.
-
-**4. Check usage logs (token counts and cost):**
-```bash
-PGPASSWORD=axonhub psql -U axonhub -h /var/run/postgresql -d axonhub_recover -c ""
-  SELECT ul.id, ul.prompt_tokens, ul.completion_tokens, ul.total_tokens,
-         ul.total_cost, ul.source, r.model_id
-  FROM usage_logs ul
-  JOIN requests r ON r.id = ul.request_id
-  WHERE ul.request_id = <ID>
-" -x
-```
-
-### Notes
-
-- The `-x` flag enables expanded/vertical output (each column on its own line), useful for wide tables.
-- `response_body` and `response_chunks` are JSONB columns — for old requests stored in DB, use `left()` or `right()` SQL functions to preview without fetching the full content. For new requests (external storage) these columns are NULL/`{}` placeholders; read the files under `/vol1/1000/axonhub-data` instead.
-- Execution records are created for each retry attempt; the same request_id can have multiple executions.
-- When a request is canceled by the client mid-flight, the status is `canceled` and subsequent operations may fail with `context canceled` errors.
-
 ## Rules Index
 
 All detailed rules are in `.agent/rules/`:
@@ -205,5 +91,8 @@ All detailed rules are in `.agent/rules/`:
 | [frontend-i18n.md](.agent/rules/frontend-i18n.md) | `frontend/src/**/*.ts`, `frontend/src/**/*.tsx`, `frontend/src/locales/*.json` | i18n 与货币格式规则 |
 | [frontend-ui.md](.agent/rules/frontend-ui.md) | `frontend/**/*.tsx` | 前端 UI 组件使用规则 |
 | [e2e.md](.agent/rules/e2e.md) | `frontend/tests/**/*.ts` | E2E testing rules |
+| [db-debugging.md](.agent/rules/db-debugging.md) | Manual | psql 连接方式、请求/执行/用量数据排查与外部存储布局 |
 | [docs.md](.agent/rules/docs.md) | `docs/**/*.md` | Documentation rules |
 | [workflows/add-channel.md](.agent/rules/workflows/add-channel.md) | Manual | Workflow for adding a new channel |
+| [workflows/version-update.md](.agent/rules/workflows/version-update.md) | Manual | Workflow to update the running system to a new version tag |
+| [workflows/model-data-sync.md](.agent/rules/workflows/model-data-sync.md) | `scripts/sync/**`, `frontend/src/features/models/**` | Workflow to refresh the models page catalog |
