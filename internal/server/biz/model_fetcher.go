@@ -220,7 +220,7 @@ func (f *ModelFetcher) getDefaultModelsByType(ctx context.Context, typ channel.T
 	case channel.TypeGithubCopilot:
 		return f.fetchCopilotModels(ctx)
 	case channel.TypeGeminiVertex:
-		return f.fetchGeminiVertexModels(ctx)
+		return f.fetchGeminiVertexModels(ctx, f.httpClient)
 	default:
 		return nil
 	}
@@ -239,8 +239,12 @@ func (f *ModelFetcher) fetchCopilotModels(ctx context.Context) []ModelIdentify {
 }
 
 // fetchGeminiVertexModels fetches Gemini Vertex models from PublicProviderConf with caching.
-func (f *ModelFetcher) fetchGeminiVertexModels(ctx context.Context) []ModelIdentify {
-	return f.geminiVertexFetcher.fetch(ctx, f.httpClient)
+// The caller decides which HttpClient reaches raw.githubusercontent.com: pass a
+// channel-proxied client (see the TypeGeminiVertex branch in FetchModels) when the
+// process environment alone cannot reach it, otherwise the failure would silently
+// fall through to the generic /v1/models endpoint and end as a confusing 404.
+func (f *ModelFetcher) fetchGeminiVertexModels(ctx context.Context, httpClient *httpclient.HttpClient) []ModelIdentify {
+	return f.geminiVertexFetcher.fetch(ctx, httpClient)
 }
 
 // clineRecommendedModel identifies a model returned by Cline's recommended-models endpoint.
@@ -373,6 +377,31 @@ func (f *ModelFetcher) FetchModels(ctx context.Context, input FetchModelsInput) 
 		return &FetchModelsResult{
 			Models: []ModelIdentify{},
 		}, nil
+	}
+
+	if input.ChannelType == channel.TypeGeminiVertex.String() {
+		httpClient := f.httpClient
+		if input.ChannelID != nil {
+			ch, err := f.channelService.entFromContext(ctx).Channel.Get(ctx, *input.ChannelID)
+			if err != nil {
+				return &FetchModelsResult{
+					Models: []ModelIdentify{},
+					Error:  lo.ToPtr(fmt.Sprintf("failed to get channel: %v", err)),
+				}, nil
+			}
+			if ch.Settings != nil && ch.Settings.Proxy != nil {
+				httpClient = httpClient.WithProxy(ch.Settings.Proxy)
+			}
+		}
+
+		models := f.fetchGeminiVertexModels(ctx, httpClient)
+		if len(models) == 0 {
+			return &FetchModelsResult{
+				Models: []ModelIdentify{},
+				Error:  lo.ToPtr("failed to fetch gemini vertex models from public provider conf; check the channel proxy or process environment proxy settings"),
+			}, nil
+		}
+		return &FetchModelsResult{Models: models}, nil
 	}
 
 	if input.ChannelType == channel.TypeCline.String() {

@@ -2,8 +2,11 @@ package biz
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1054,6 +1057,118 @@ func TestFetchModelsGeminiVertex(t *testing.T) {
 	if int(callCount.Load()) != 1 {
 		t.Errorf("expected 1 server call (cached), got %d", callCount.Load())
 	}
+}
+
+// TestFetchModelsGeminiVertexUsesChannelProxy verifies that a gemini_vertex channel
+// with a proxy configured reaches the PublicProviderConf catalog through that proxy,
+// and that the proxy-less fetcher on its own cannot (the upstream is unreachable
+// without the proxy in some deployments).
+func TestFetchModelsGeminiVertexUsesChannelProxy(t *testing.T) {
+	var proxyHit atomic.Int32
+
+	providerConf := `{"id":"google-vertex","models":[{"id":"gemini-1.5-pro"}]}`
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(providerConf))
+	}))
+	defer target.Close()
+
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyHit.Add(1)
+		forward, err := http.NewRequestWithContext(r.Context(), r.Method, target.URL, nil)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		resp, err := http.DefaultClient.Do(forward)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+		w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
+	}))
+	defer proxy.Close()
+
+	client := enttest.NewEntClient(t, "sqlite3", "file:fetch_models_vertex_proxy?mode=memory&_fk=0")
+	defer client.Close()
+
+	ctx := authz.WithSystemBypass(context.Background(), "test")
+	ch, err := client.Channel.Create().
+		SetName("vertex-proxy").
+		SetType(channel.TypeGeminiVertex).
+		SetBaseURL("https://aiplatform.googleapis.com").
+		SetCredentials(objects.ChannelCredentials{APIKey: "stored-secret"}).
+		SetSupportedModels([]string{"gemini-1.5-pro"}).
+		SetDefaultTestModel("gemini-1.5-pro").
+		SetSettings(&objects.ChannelSettings{Proxy: &httpclient.ProxyConfig{
+			Type: httpclient.ProxyTypeURL,
+			URL:  proxy.URL,
+		}}).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// The process-level client cannot reach anything (simulates an environment
+	// where raw.githubusercontent.com is unreachable without the channel proxy),
+	// so any successful fetch can only have come through the channel proxy.
+	blockedClient := httpclient.NewHttpClientWithClient(&http.Client{
+		Transport: &http.Transport{Proxy: func(*http.Request) (*url.URL, error) {
+			return nil, errors.New("network unreachable")
+		}},
+		Timeout: 2 * time.Second,
+	})
+
+	fetcher := NewModelFetcher(
+		blockedClient,
+		&ChannelService{AbstractService: &AbstractService{db: client}},
+	)
+	fetcher.geminiVertexFetcher.providerURL = target.URL
+
+	result, err := fetcher.FetchModels(ctx, FetchModelsInput{
+		ChannelType: channel.TypeGeminiVertex.String(),
+		BaseURL:     ch.BaseURL,
+		ChannelID:   &ch.ID,
+	})
+	require.NoError(t, err)
+	require.Nil(t, result.Error)
+	require.Equal(t, []ModelIdentify{{ID: "gemini-1.5-pro"}}, result.Models)
+	require.Equal(t, int32(1), proxyHit.Load(), "provider conf fetch must traverse the channel proxy")
+
+	// Second call is served from cache: still exactly one proxy request.
+	result2, err := fetcher.FetchModels(ctx, FetchModelsInput{
+		ChannelType: channel.TypeGeminiVertex.String(),
+		BaseURL:     ch.BaseURL,
+		ChannelID:   &ch.ID,
+	})
+	require.NoError(t, err)
+	require.Nil(t, result2.Error)
+	require.Equal(t, int32(1), proxyHit.Load())
+}
+
+// TestFetchModelsGeminiVertexSurfacesErrorWhenUnreachable ensures a total failure
+// surfaces an explicit error instead of silently falling through to the generic
+// /v1/models endpoint (which 404s on aiplatform.googleapis.com).
+func TestFetchModelsGeminiVertexSurfacesErrorWhenUnreachable(t *testing.T) {
+	blockedClient := httpclient.NewHttpClientWithClient(&http.Client{
+		Transport: &http.Transport{Proxy: func(*http.Request) (*url.URL, error) {
+			return nil, errors.New("network unreachable")
+		}},
+		Timeout: 2 * time.Second,
+	})
+
+	fetcher := NewModelFetcher(blockedClient, nil)
+	fetcher.geminiVertexFetcher.providerURL = "http://127.0.0.1:1/google-vertex.json"
+
+	result, err := fetcher.FetchModels(context.Background(), FetchModelsInput{
+		ChannelType: channel.TypeGeminiVertex.String(),
+		BaseURL:     "https://aiplatform.googleapis.com",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Error)
+	require.Contains(t, *result.Error, "public provider conf")
+	require.Empty(t, result.Models)
 }
 
 func TestFetchCopilotModels(t *testing.T) {
